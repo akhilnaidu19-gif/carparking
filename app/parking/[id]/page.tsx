@@ -106,11 +106,15 @@ export default function ParkingDetailsPage() {
                   });
 
                   await updateDoc(
-                    doc(db, "parkings", parking.id),
-                    {
-                      availability: "Occupied",
-                    }
-                  );
+  doc(db, "parkings", parking.id),
+  {
+    availability: "Occupied",
+  }
+);
+
+console.log("Availability Updated");
+
+
 
                   setParking({
                     ...parking,
