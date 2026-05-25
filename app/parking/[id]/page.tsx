@@ -1,4 +1,5 @@
 "use client";
+import Script from "next/script";
 
 import { useEffect, useState } from "react";
 
@@ -52,6 +53,8 @@ export default function ParkingDetailsPage() {
   }
 
   return (
+        <>
+  <Script src="https://checkout.razorpay.com/v1/checkout.js" />
     <div className="min-h-screen bg-gray-100">
 
       <div
@@ -85,6 +88,74 @@ export default function ParkingDetailsPage() {
 
           <div className="bg-white p-8 rounded-3xl shadow-lg">
 
+  <h2 className="text-2xl font-bold mb-4">
+    Yearly Plan
+  </h2>
+
+  <p className="text-4xl font-bold text-black mb-4">
+    ₹30000/year
+  </p>
+
+  <button
+    onClick={async () => {
+
+      try {
+
+        const options = {
+          key: "rzp_test_StbVrnH5ksikrS",
+          amount: 30000 * 100,
+          currency: "INR",
+          name: "CarParking Bangalore",
+          description: "Yearly Parking Booking",
+
+          handler: async function () {
+
+            await addDoc(collection(db, "bookings"), {
+              parkingId: parking.id,
+              title: parking.title,
+              location: parking.location,
+              paymentStatus: "Paid",
+              plan: "Yearly",
+            });
+
+            await updateDoc(
+              doc(db, "parkings", parking.id),
+              {
+                availability: "Occupied",
+              }
+            );
+
+            setParking({
+              ...parking,
+              availability: "Occupied",
+            });
+
+            alert("Yearly Parking Booked");
+
+          },
+        };
+
+        const razor = new (window as any).Razorpay(options);
+
+        razor.open();
+
+      } catch (error) {
+        console.log(error);
+      }
+
+    }}
+    disabled={parking.availability === "Occupied"}
+    className="bg-black text-white px-6 py-3 rounded-2xl font-bold disabled:bg-gray-400"
+  >
+    {parking.availability === "Occupied"
+      ? "Already Occupied"
+      : "Book Yearly"}
+  </button>
+
+</div>
+
+          <div className="bg-white p-8 rounded-3xl shadow-lg">
+
             <h2 className="text-2xl font-bold mb-4">
               Monthly Plan
             </h2>
@@ -96,38 +167,59 @@ export default function ParkingDetailsPage() {
             <button
               onClick={async () => {
 
-                try {
+  try {
 
-                  await addDoc(collection(db, "bookings"), {
-                    parkingId: parking.id,
-                    title: parking.title,
-                    location: parking.location,
-                    paymentStatus: "Paid",
-                  });
+    const options = {
 
-                  await updateDoc(
-  doc(db, "parkings", parking.id),
-  {
-    availability: "Occupied",
+      key: "YOUR_RAZORPAY_KEY",
+
+      amount: Number(parking.monthlyPrice) * 100,
+
+      currency: "INR",
+
+      name: "CarParking Bangalore",
+
+      description: "Monthly Parking Booking",
+
+      handler: async function () {
+
+        await addDoc(collection(db, "bookings"), {
+          parkingId: parking.id,
+          title: parking.title,
+          location: parking.location,
+          paymentStatus: "Paid",
+          plan: "Monthly",
+        });
+
+        await updateDoc(
+          doc(db, "parkings", parking.id),
+          {
+            availability: "Occupied",
+          }
+        );
+
+        setParking({
+          ...parking,
+          availability: "Occupied",
+        });
+
+        alert("Monthly Parking Booked");
+
+      },
+
+    };
+
+    const razor = new (window as any).Razorpay(options);
+
+    razor.open();
+
+  } catch (error) {
+
+    console.log(error);
+
   }
-);
 
-console.log("Availability Updated");
-
-
-
-                  setParking({
-                    ...parking,
-                    availability: "Occupied",
-                  });
-
-                  alert("Parking Booked");
-
-                } catch (error) {
-                  console.log(error);
-                }
-
-              }}
+}}
               disabled={parking.availability === "Occupied"}
               className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold disabled:bg-gray-400"
             >
@@ -143,5 +235,6 @@ console.log("Availability Updated");
       </div>
 
     </div>
+ </>
   );
 }
