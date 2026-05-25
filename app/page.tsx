@@ -360,12 +360,33 @@ useEffect(() => {
     <div>
       <h4 className="font-bold mb-4">For Owners</h4>
 
-      <ul className="space-y-2 text-gray-400">
-        <li>List Parking</li>
-        <li>Owner Dashboard</li>
-        <li>Earnings</li>
-        <li>Support</li>
-      </ul>
+     <ul className="space-y-2 text-gray-400">
+
+  <li>
+    <a href="/add-parking">
+      List Parking
+    </a>
+  </li>
+
+  <li>
+    <a href="/dashboard">
+      Owner Dashboard
+    </a>
+  </li>
+
+  <li>
+    <a href="/bookings">
+      Earnings
+    </a>
+  </li>
+
+  <li>
+    <a href="/contact">
+      Support
+    </a>
+  </li>
+
+</ul>
     </div>
 
     <div>
@@ -373,8 +394,8 @@ useEffect(() => {
 
       <ul className="space-y-2 text-gray-400">
         <li>Bangalore, India</li>
-        <li>support@carparkingbangalore.com</li>
-        <li>+91 9876543210</li>
+        <li>akhilnaidu19@gmail.com</li>
+        <li>+91 9206687300</li>
       </ul>
     </div>
   </div>
