@@ -85,14 +85,22 @@ useEffect(() => {
   </button>
 )}
         <div className="flex gap-3">
-          <button className="bg-white text-black px-4 py-2 rounded-xl font-semibold">
-            Login
-          </button>
 
-          <button className="bg-green-500 px-4 py-2 rounded-xl font-semibold">
-            Register
-          </button>
-        </div>
+  <a
+    href="/login"
+    className="bg-white text-black px-4 py-2 rounded-xl font-semibold"
+  >
+    Login
+  </a>
+
+  <a
+    href="/signup"
+    className="bg-green-500 px-4 py-2 rounded-xl font-semibold"
+  >
+    Register
+  </a>
+
+</div>
       </header>
 
       {/* Hero Section */}
@@ -279,9 +287,12 @@ useEffect(() => {
             List your unused parking slots and start earning monthly income.
           </p>
 
-          <button className="bg-green-500 px-10 py-5 rounded-2xl text-xl font-bold">
-            List Your Parking
-          </button>
+          <a
+  href="/add-parking"
+  className="inline-block bg-green-500 px-10 py-5 rounded-2xl text-xl font-bold"
+>
+  List Your Parking
+</a>
         </div>
       </section>
 
@@ -328,10 +339,21 @@ useEffect(() => {
       <h4 className="font-bold mb-4">Quick Links</h4>
 
       <ul className="space-y-2 text-gray-400">
-        <li>Home</li>
-        <li>Search Parking</li>
-        <li>Pricing</li>
-        <li>Contact</li>
+        <li>
+  <a href="/">Home</a>
+</li>
+
+<li>
+  <a href="#parking">Search Parking</a>
+</li>
+
+<li>
+  <a href="/dashboard">Dashboard</a>
+</li>
+
+<li>
+  <a href="/bookings">Bookings</a>
+</li>
       </ul>
     </div>
 
