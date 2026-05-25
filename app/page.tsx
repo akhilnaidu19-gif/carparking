@@ -63,9 +63,9 @@ useEffect(() => {
     List Parking
   </a>
 
-  <a href="#" className="hover:text-green-400">
-    Contact
-  </a>
+  <a href="/contact" className="hover:text-green-400">
+  Contact
+</a>
 </nav>
 
 {user && (
