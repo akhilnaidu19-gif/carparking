@@ -221,8 +221,8 @@ useEffect(() => {
                     </div>
                   </div>
 
-                 <a
-  href={`/booking/${spot.id}`}
+                <a
+  href={`/parking/${spot.id}`}
   className="block text-center w-full bg-green-500 text-white py-3 rounded-2xl font-bold"
 >
   Book Now
