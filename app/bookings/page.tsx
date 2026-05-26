@@ -71,19 +71,19 @@ export default function BookingsPage() {
               </p>
 
               <p className="text-gray-600 mb-2">
-                Name: {booking.name}
+                Name: {booking.name || "N/A"}
               </p>
 
               <p className="text-gray-600 mb-2">
-                Email: {booking.email}
+                Email: {booking.email || "N/A"}
               </p>
 
               <p className="text-gray-600 mb-2">
-                Date: {booking.date}
+                Date: {booking.date || "N/A"}
               </p>
 
               <p className="text-gray-600 mb-4">
-                Time: {booking.time}
+                Time: {booking.time || "N/A"}
               </p>
 
               <span className="bg-green-500 text-white px-4 py-2 rounded-xl">
@@ -96,12 +96,16 @@ export default function BookingsPage() {
 
                   try {
 
-                    await updateDoc(
-                      doc(db, "parkings", booking.parkingId),
-                      {
-                        availability: "Available",
-                      }
-                    );
+                    if (booking.parkingId) {
+
+                      await updateDoc(
+                        doc(db, "parkings", booking.parkingId),
+                        {
+                          availability: "Available",
+                        }
+                      );
+
+                    }
 
                     await deleteDoc(
                       doc(db, "bookings", booking.id)
