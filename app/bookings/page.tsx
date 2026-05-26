@@ -92,45 +92,54 @@ export default function BookingsPage() {
 
               <button
 
-                onClick={async () => {
+  onClick={async () => {
 
-                  try {
+    try {
 
-                    if (booking.parkingId) {
+      console.log("Cancelling:", booking);
 
-                      await updateDoc(
-                        doc(db, "parkings", booking.parkingId),
-                        {
-                          availability: "Available",
-                        }
-                      );
+      if (
+        booking.parkingId &&
+        booking.parkingId !== ""
+      ) {
 
-                    }
+        await updateDoc(
+          doc(db, "parkings", booking.parkingId),
+          {
+            availability: "Available",
+          }
+        );
 
-                    await deleteDoc(
-                      doc(db, "bookings", booking.id)
-                    );
+        console.log("Parking Updated");
 
-                    setBookings(
-                      bookings.filter(
-                        (item) => item.id !== booking.id
-                      )
-                    );
+      }
 
-                    alert("Booking Cancelled");
+      await deleteDoc(
+        doc(db, "bookings", booking.id)
+      );
 
-                  } catch (error) {
+      console.log("Booking Deleted");
 
-                    console.log(error);
+      setBookings(
+        bookings.filter(
+          (item) => item.id !== booking.id
+        )
+      );
 
-                  }
+      alert("Booking Cancelled");
 
-                }}
+    } catch (error) {
 
-                className="bg-red-500 text-white px-4 py-2 rounded-xl ml-4"
-              >
-                Cancel Booking
-              </button>
+      console.log("CANCEL ERROR:", error);
+
+    }
+
+  }}
+
+  className="bg-red-500 text-white px-4 py-2 rounded-xl ml-4"
+>
+  Cancel Booking
+</button>
 
             </div>
 
