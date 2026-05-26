@@ -20,6 +20,9 @@ export default function BookingsPage() {
 
     const fetchBookings = async () => {
 
+      const userEmail =
+        localStorage.getItem("userEmail");
+
       const querySnapshot = await getDocs(
         collection(db, "bookings")
       );
@@ -28,10 +31,16 @@ export default function BookingsPage() {
 
       querySnapshot.forEach((doc) => {
 
-        bookingData.push({
-          id: doc.id,
-          ...doc.data(),
-        });
+        const data = doc.data();
+
+        if (data.email === userEmail) {
+
+          bookingData.push({
+            id: doc.id,
+            ...data,
+          });
+
+        }
 
       });
 
@@ -92,62 +101,62 @@ export default function BookingsPage() {
 
               <button
 
-  onClick={async () => {
+                onClick={async () => {
 
-    try {
+                  try {
 
-      console.log("Cancelling:", booking);
+                    console.log("Cancelling:", booking);
 
-      try {
+                    try {
 
-  if (
-    booking.parkingId &&
-    booking.parkingId !== ""
-  ) {
+                      if (
+                        booking.parkingId &&
+                        booking.parkingId !== ""
+                      ) {
 
-    await updateDoc(
-      doc(db, "parkings", booking.parkingId),
-      {
-        availability: "Available",
-      }
-    );
+                        await updateDoc(
+                          doc(db, "parkings", booking.parkingId),
+                          {
+                            availability: "Available",
+                          }
+                        );
 
-    console.log("Parking Updated");
+                        console.log("Parking Updated");
 
-  }
+                      }
 
-} catch (error) {
+                    } catch (error) {
 
-  console.log("Parking Update Skipped");
+                      console.log("Parking Update Skipped");
 
-}
+                    }
 
-      await deleteDoc(
-        doc(db, "bookings", booking.id)
-      );
+                    await deleteDoc(
+                      doc(db, "bookings", booking.id)
+                    );
 
-      console.log("Booking Deleted");
+                    console.log("Booking Deleted");
 
-      setBookings(
-        bookings.filter(
-          (item) => item.id !== booking.id
-        )
-      );
+                    setBookings(
+                      bookings.filter(
+                        (item) => item.id !== booking.id
+                      )
+                    );
 
-      alert("Booking Cancelled");
+                    alert("Booking Cancelled");
 
-    } catch (error) {
+                  } catch (error) {
 
-      console.log("CANCEL ERROR:", error);
+                    console.log("CANCEL ERROR:", error);
 
-    }
+                  }
 
-  }}
+                }}
 
-  className="bg-red-500 text-white px-4 py-2 rounded-xl ml-4"
->
-  Cancel Booking
-</button>
+                className="bg-red-500 text-white px-4 py-2 rounded-xl ml-4"
+              >
+                Cancel Booking
+              </button>
 
             </div>
 

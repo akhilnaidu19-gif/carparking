@@ -120,6 +120,8 @@ console.log(parking.id);
               location: parking.location,
               paymentStatus: "Paid",
               plan: "Yearly",
+              email: localStorage.getItem("userEmail"),
+name: localStorage.getItem("userName"),
             });
 
             await updateDoc(
