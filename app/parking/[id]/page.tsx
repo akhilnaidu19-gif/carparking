@@ -121,6 +121,7 @@ console.log(parking.id);
               paymentStatus: "Paid",
               plan: "Yearly",
               email: localStorage.getItem("userEmail"),
+              
 name: localStorage.getItem("userName"),
             });
 
@@ -146,6 +147,8 @@ name: localStorage.getItem("userName"),
   title: parking.title,
   location: parking.location,
   paymentStatus: "Paid",
+    email: localStorage.getItem("userEmail"),
+          name: localStorage.getItem("userName"),
 });
 
 await updateDoc(
@@ -212,6 +215,8 @@ alert("Parking Booked Successfully");
           location: parking.location,
           paymentStatus: "Paid",
           plan: "Monthly",
+          email: localStorage.getItem("userEmail"),
+          name: localStorage.getItem("userName"),
         });
 
         await updateDoc(
