@@ -71,9 +71,15 @@ export default function BookingsPage() {
               className="bg-white p-8 rounded-3xl shadow-lg"
             >
 
-              <h2 className="text-2xl font-bold mb-3">
-                Parking Booking
-              </h2>
+              <img
+  src={booking.image}
+  alt={booking.title}
+  className="w-full h-60 object-cover rounded-2xl mb-6"
+/>
+
+<h2 className="text-3xl font-bold mb-3">
+  {booking.title}
+</h2>
 
               <p className="text-gray-600 mb-2">
                 Booking ID: {booking.id}
@@ -88,12 +94,24 @@ export default function BookingsPage() {
               </p>
 
               <p className="text-gray-600 mb-2">
-                Date: {booking.date || "N/A"}
-              </p>
+  Owner: {booking.owner || "N/A"}
+</p>
 
-              <p className="text-gray-600 mb-4">
-                Time: {booking.time || "N/A"}
-              </p>
+              <p className="text-gray-600 mb-2">
+  Plan: {booking.plan || "N/A"}
+</p>
+
+<p className="text-gray-600 mb-2">
+  Booking Date: {booking.bookingDate || "N/A"}
+</p>
+
+<p className="text-gray-600 mb-2">
+  Booking Time: {booking.bookingTime || "N/A"}
+</p>
+
+<p className="text-gray-600 mb-4">
+  Valid Till: {booking.validTill || "N/A"}
+</p>
 
               <span className="bg-green-500 text-white px-4 py-2 rounded-xl">
                 {booking.paymentStatus}

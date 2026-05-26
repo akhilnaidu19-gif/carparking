@@ -1,49 +1,103 @@
 "use client";
+
 import { useEffect, useState } from "react";
+
 import { collection, getDocs } from "firebase/firestore";
+
 import {
   getAuth,
   onAuthStateChanged,
   signOut,
 } from "firebase/auth";
+
 import { app } from "@/lib/firebase";
+
 import { db } from "@/lib/firebase";
+
 export default function Home() {
+
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
+
   const [user, setUser] = useState<any>(null);
+
   const [currentLocation, setCurrentLocation] = useState("");
+
   const [search, setSearch] = useState("");
 
-const auth = getAuth(app);
+  const [loading, setLoading] = useState(true);
 
-useEffect(() => {
+  const auth = getAuth(app);
 
-  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    setUser(currentUser);
-  });
+  useEffect(() => {
 
-  return () => unsubscribe();
+    const unsubscribe = onAuthStateChanged(
 
-}, []);
-useEffect(() => {
-  const fetchParkings = async () => {
-    const querySnapshot = await getDocs(collection(db, "parkings"));
+      auth,
 
-    const parkingData: any[] = [];
+      (currentUser) => {
 
-    querySnapshot.forEach((doc) => {
-      parkingData.push({
-        id: doc.id,
-        ...doc.data(),
-      });
-    });
+        setUser(currentUser);
 
-    setParkingSpots(parkingData);
-  };
+      }
 
-  fetchParkings();
-}, []);
+    );
 
+    return () => unsubscribe();
+
+  }, []);
+
+  useEffect(() => {
+
+    const fetchParkings = async () => {
+
+      try {
+
+        const querySnapshot = await getDocs(
+          collection(db, "parkings")
+        );
+
+        const parkingData: any[] = [];
+
+        querySnapshot.forEach((doc) => {
+
+          parkingData.push({
+            id: doc.id,
+            ...doc.data(),
+          });
+
+        });
+
+        setParkingSpots(parkingData);
+
+        setLoading(false);
+
+      } catch (error) {
+
+        console.log(error);
+
+        setLoading(false);
+
+      }
+
+    };
+
+    fetchParkings();
+
+  }, []);
+
+  if (loading) {
+
+    return (
+
+      <div className="min-h-screen flex items-center justify-center text-3xl font-bold">
+
+        Loading Parking Slots...
+
+      </div>
+
+    );
+
+  }
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 scroll-smooth">
       {/* Header */}
@@ -78,6 +132,12 @@ useEffect(() => {
   <button
     onClick={async () => {
       await signOut(auth);
+
+localStorage.removeItem("userEmail");
+
+localStorage.removeItem("userName");
+
+window.location.href = "/";
     }}
     className="bg-red-500 text-white px-4 py-2 rounded-xl font-semibold"
   >
@@ -86,19 +146,27 @@ useEffect(() => {
 )}
         <div className="flex gap-3">
 
-  <a
-    href="/login"
-    className="bg-white text-black px-4 py-2 rounded-xl font-semibold"
-  >
-    Login
-  </a>
+  {!user && (
 
-  <a
-    href="/signup"
-    className="bg-green-500 px-4 py-2 rounded-xl font-semibold"
-  >
-    Register
-  </a>
+    <>
+
+      <a
+        href="/login"
+        className="bg-white text-black px-4 py-2 rounded-xl font-semibold"
+      >
+        Login
+      </a>
+
+      <a
+        href="/signup"
+        className="bg-green-500 px-4 py-2 rounded-xl font-semibold"
+      >
+        Register
+      </a>
+
+    </>
+
+  )}
 
 </div>
       </header>
