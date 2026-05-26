@@ -171,9 +171,9 @@ export default function ParkingDetailsPage() {
 
     const options = {
 
-      key: "YOUR_RAZORPAY_KEY",
+      key: "rzp_test_StbVrnH5ksikrS",
 
-      amount: Number(parking.monthlyPrice) * 100,
+      amount: parseInt(parking.monthlyPrice) * 100,
 
       currency: "INR",
 
