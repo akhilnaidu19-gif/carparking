@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import {
   collection,
   getDocs,
   deleteDoc,
   doc,
+  updateDoc,
 } from "firebase/firestore";
+
 import { db } from "@/lib/firebase";
 
 export default function BookingsPage() {
@@ -24,13 +27,16 @@ export default function BookingsPage() {
       const bookingData: any[] = [];
 
       querySnapshot.forEach((doc) => {
+
         bookingData.push({
           id: doc.id,
           ...doc.data(),
         });
+
       });
 
       setBookings(bookingData);
+
     };
 
     fetchBookings();
@@ -38,6 +44,7 @@ export default function BookingsPage() {
   }, []);
 
   return (
+
     <div className="min-h-screen bg-gray-100 py-16 px-6">
 
       <div className="max-w-6xl mx-auto">
@@ -80,34 +87,46 @@ export default function BookingsPage() {
               </p>
 
               <span className="bg-green-500 text-white px-4 py-2 rounded-xl">
-  {booking.paymentStatus}
-</span>
-<button
-  onClick={async () => {
+                {booking.paymentStatus}
+              </span>
 
-    try {
+              <button
 
-      await deleteDoc(
-        doc(db, "bookings", booking.id)
-      );
+                onClick={async () => {
 
-      setBookings(
-        bookings.filter(
-          (item) => item.id !== booking.id
-        )
-      );
+                  try {
 
-      alert("Booking Cancelled");
+                    await updateDoc(
+                      doc(db, "parkings", booking.parkingId),
+                      {
+                        availability: "Available",
+                      }
+                    );
 
-    } catch (error) {
-      console.log(error);
-    }
+                    await deleteDoc(
+                      doc(db, "bookings", booking.id)
+                    );
 
-  }}
-  className="bg-red-500 text-white px-4 py-2 rounded-xl ml-4"
->
-  Cancel Booking
-</button>
+                    setBookings(
+                      bookings.filter(
+                        (item) => item.id !== booking.id
+                      )
+                    );
+
+                    alert("Booking Cancelled");
+
+                  } catch (error) {
+
+                    console.log(error);
+
+                  }
+
+                }}
+
+                className="bg-red-500 text-white px-4 py-2 rounded-xl ml-4"
+              >
+                Cancel Booking
+              </button>
 
             </div>
 
@@ -118,5 +137,7 @@ export default function BookingsPage() {
       </div>
 
     </div>
+
   );
+
 }

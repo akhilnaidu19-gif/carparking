@@ -230,9 +230,26 @@ alert("Parking Booked Successfully");
 
     };
 
-    const razor = new (window as any).Razorpay(options);
+   await addDoc(collection(db, "bookings"), {
+  parkingId: parking.id,
+  title: parking.title,
+  location: parking.location,
+  paymentStatus: "Paid",
+});
 
-    razor.open();
+await updateDoc(
+  doc(db, "parkings", parking.id),
+  {
+    availability: "Occupied",
+  }
+);
+
+setParking({
+  ...parking,
+  availability: "Occupied",
+});
+
+alert("Parking Booked Successfully");
 
   } catch (error) {
 
