@@ -108,7 +108,11 @@ export default function ParkingDetailsPage() {
           name: "CarParking Bangalore",
           description: "Yearly Parking Booking",
 
-          handler: async function () {
+          handler: async function (response: any) {
+
+            console.log("Payment Success");
+console.log(response);
+console.log(parking.id);
 
             await addDoc(collection(db, "bookings"), {
               parkingId: parking.id,
