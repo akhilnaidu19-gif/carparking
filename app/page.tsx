@@ -48,56 +48,46 @@ export default function Home() {
 
   useEffect(() => {
 
-    const fetchParkings = async () => {
+  const fetchParkings = async () => {
 
-      try {
+    setLoading(true);
 
-        const querySnapshot = await getDocs(
-          collection(db, "parkings")
-        );
+    try {
 
-        const parkingData: any[] = [];
+      const querySnapshot = await getDocs(
+        collection(db, "parkings")
+      );
 
-        querySnapshot.forEach((doc) => {
+      const parkingData: any[] = [];
 
-          parkingData.push({
-            id: doc.id,
-            ...doc.data(),
-          });
+      querySnapshot.forEach((doc) => {
 
+        parkingData.push({
+          id: doc.id,
+          ...doc.data(),
         });
 
-        setParkingSpots(parkingData);
+      });
 
-        setLoading(false);
+      setParkingSpots(parkingData);
 
-      } catch (error) {
+    } catch (error) {
 
-        console.log(error);
+      console.log(error);
 
-        setLoading(false);
+    } finally {
 
-      }
+      setLoading(false);
 
-    };
+    }
 
-    fetchParkings();
+  };
 
-  }, []);
+  fetchParkings();
 
-  if (loading) {
+}, []);
 
-    return (
-
-      <div className="min-h-screen flex items-center justify-center text-3xl font-bold">
-
-        Loading Parking Slots...
-
-      </div>
-
-    );
-
-  }
+  
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 scroll-smooth">
       {/* Header */}
@@ -234,111 +224,117 @@ window.location.href = "/";
       </section>
 
       {/* Parking Listings */}
-      <section id="parking" className="py-20 px-6">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-4xl font-bold mb-10">
-            Available Parking Slots
-          </h2>
+<section id="parking" className="py-20 px-6">
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {parkingSpots
-  .filter((spot) =>
-    spot.location
-      ?.toLowerCase()
-      .includes(search.toLowerCase())
-  )
-  .map((spot) => (
-              <div
-                key={spot.id}
-                className="bg-white rounded-3xl overflow-hidden shadow-lg"
-              >
-                <img
-  src={spot.image || "https://via.placeholder.com/400"}
-                  alt={spot.title}
-                  className="h-60 w-full object-cover"
-                />
-
-                <div className="p-6">
-                  <h3 className="text-2xl font-bold mb-2">
-                    {spot.title}
-                  </h3>
-
-                  <p className="text-gray-600 mb-4">
-                    {spot.location}
-                  </p>
-
-                  <span
-  className={`inline-block px-4 py-2 rounded-xl text-white font-semibold mb-4 ${
-    spot.availability === "Available"
-      ? "bg-green-500"
-      : "bg-red-500"
-  }`}
->
-  {spot.availability}
-</span>
-
-                  <div className="flex justify-between mb-5">
-                    <div>
-                      <p className="text-sm text-gray-500">Monthly</p>
-                      <p className="font-bold">₹{spot.monthlyPrice}/month</p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-gray-500">Yearly</p>
-                      <p className="font-bold">₹30000/year</p>
-                    </div>
-                  </div>
-
-                <a
-  href={`/parking/${spot.id}`}
-  className="block text-center w-full bg-green-500 text-white py-3 rounded-2xl font-bold"
->
-  Book Now
-</a>
-
-<a
-  href={`https://www.google.com/maps/search/?api=1&query=${spot.location}`}
-  target="_blank"
-  className="block text-center w-full bg-black text-white py-3 rounded-2xl font-bold mt-3"
->
-  Open in Maps
-</a>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-{/* How It Works */}
-<section className="py-20 px-6 bg-white">
   <div className="max-w-7xl mx-auto">
-    <h2 className="text-4xl font-bold text-center mb-14">
-      How It Works
+
+    <h2 className="text-4xl font-bold mb-10">
+      Available Parking Slots
     </h2>
 
-    <div className="grid md:grid-cols-4 gap-8">
-      {[
-        "Search Nearby Parking",
-        "Choose Your Slot",
-        "Pay Securely Online",
-        "Park Hassle-Free",
-      ].map((item, index) => (
-        <div
-          key={index}
-          className="bg-gray-100 rounded-3xl p-8 text-center shadow-md"
-        >
-          <div className="w-16 h-16 rounded-full bg-green-500 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-5">
-            {index + 1}
-          </div>
+    {loading ? (
 
-          <h3 className="text-xl font-semibold">
-            {item}
-          </h3>
-        </div>
-      ))}
-    </div>
+      <h1 className="text-2xl font-bold">
+        Loading Parking Slots...
+      </h1>
+
+    ) : (
+
+      <div className="grid md:grid-cols-3 gap-8">
+
+        {parkingSpots
+          .filter((spot) =>
+            spot.location
+              ?.toLowerCase()
+              .includes(search.toLowerCase())
+          )
+          .map((spot) => (
+
+            <div
+              key={spot.id}
+              className="bg-white rounded-3xl overflow-hidden shadow-lg"
+            >
+
+              <img
+                src={
+                  spot.image ||
+                  "https://via.placeholder.com/400"
+                }
+                alt={spot.title}
+                className="h-60 w-full object-cover"
+              />
+
+              <div className="p-6">
+
+                <h3 className="text-2xl font-bold mb-2">
+                  {spot.title}
+                </h3>
+
+                <p className="text-gray-600 mb-4">
+                  {spot.location}
+                </p>
+
+                <span
+                  className={`inline-block px-4 py-2 rounded-xl text-white font-semibold mb-4 ${
+                    spot.availability === "Available"
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                  }`}
+                >
+                  {spot.availability}
+                </span>
+
+                <div className="flex justify-between mb-5">
+
+                  <div>
+                    <p className="text-sm text-gray-500">
+                      Monthly
+                    </p>
+
+                    <p className="font-bold">
+                      ₹{spot.monthlyPrice}/month
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">
+                      Yearly
+                    </p>
+
+                    <p className="font-bold">
+                      ₹30000/year
+                    </p>
+                  </div>
+
+                </div>
+
+                <a
+                  href={`/parking/${spot.id}`}
+                  className="block text-center w-full bg-green-500 text-white py-3 rounded-2xl font-bold"
+                >
+                  Book Now
+                </a>
+
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${spot.location}`}
+                  target="_blank"
+                  className="block text-center w-full bg-black text-white py-3 rounded-2xl font-bold mt-3"
+                >
+                  Open in Maps
+                </a>
+
+              </div>
+
+            </div>
+
+          ))}
+
+      </div>
+
+    )}
+
   </div>
+
 </section>
 
       {/* Owner Section */}
