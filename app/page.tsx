@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import Image from "next/image";
+
 import { useEffect, useState } from "react";
 
 import { collection, getDocs } from "firebase/firestore";
@@ -10,465 +13,430 @@ import {
   signOut,
 } from "firebase/auth";
 
-import { app } from "@/lib/firebase";
-
-import { db } from "@/lib/firebase";
+import { app, db } from "@/lib/firebase";
 
 export default function Home() {
 
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
 
-  const [user, setUser] = useState<any>(null);
-
-  const [currentLocation, setCurrentLocation] = useState("");
-
   const [search, setSearch] = useState("");
+
+  const [user, setUser] = useState<any>(null);
 
   const [loading, setLoading] = useState(true);
 
   const auth = getAuth(app);
 
+  // AUTH STATE
   useEffect(() => {
 
     const unsubscribe = onAuthStateChanged(
-
       auth,
-
       (currentUser) => {
 
         setUser(currentUser);
 
       }
-
     );
 
     return () => unsubscribe();
 
   }, []);
 
+  // FETCH PARKINGS
   useEffect(() => {
 
-  const fetchParkings = async () => {
+    const fetchParkings = async () => {
 
-    setLoading(true);
+      try {
 
-    try {
+        setLoading(true);
 
-      const querySnapshot = await getDocs(
-        collection(db, "parkings")
-      );
+        const querySnapshot = await getDocs(
+          collection(db, "parkings")
+        );
 
-      const parkingData: any[] = [];
+        const parkingData: any[] = [];
 
-      querySnapshot.forEach((doc) => {
+        querySnapshot.forEach((doc) => {
 
-        parkingData.push({
-          id: doc.id,
-          ...doc.data(),
+          parkingData.push({
+            id: doc.id,
+            ...doc.data(),
+          });
+
         });
 
-      });
+        setParkingSpots(parkingData);
 
-      setParkingSpots(parkingData);
+      } catch (error) {
 
-    } catch (error) {
+        console.log(error);
 
-      console.log(error);
+      } finally {
 
-    } finally {
+        setLoading(false);
 
-      setLoading(false);
+      }
 
-    }
+    };
 
-  };
+    fetchParkings();
 
-  fetchParkings();
+  }, []);
 
-}, []);
-
-  
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900 scroll-smooth">
-      {/* Header */}
-      <header className="bg-black text-white px-6 py-4 flex justify-between items-center shadow-lg sticky top-0 z-50">
-        <h1 className="text-2xl font-bold">CarParking Bangalore</h1>
 
-<nav className="hidden md:flex gap-6 text-sm">
-  <a href="#home" className="hover:text-green-400">
-    Home
-  </a>
+    <div className="min-h-screen bg-gray-100 text-gray-900">
 
-  <a href="#parking" className="hover:text-green-400">
-    Search Parking
-  </a>
+      {/* HEADER */}
 
-  <a href="#owners" className="hover:text-green-400">
-    List Parking
-  </a>
+      <header className="bg-black text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
 
-  <a href="/contact" className="hover:text-green-400">
-  Contact
-</a>
-</nav>
+        <h1 className="text-3xl font-bold">
+          CarParking Bangalore
+        </h1>
 
-{user && (
-  <p className="text-sm text-green-400">
-    {user.email}
-  </p>
-)}
+        <nav className="hidden md:flex gap-8 font-medium">
 
-{user && (
-  <button
-    onClick={async () => {
-      await signOut(auth);
+          <a href="#home">Home</a>
 
-localStorage.removeItem("userEmail");
+          <a href="#parking">Search Parking</a>
 
-localStorage.removeItem("userName");
+          <a href="#owners">List Parking</a>
 
-window.location.href = "/";
-    }}
-    className="bg-red-500 text-white px-4 py-2 rounded-xl font-semibold"
-  >
-    Logout
-  </button>
-)}
-        <div className="flex gap-3">
+          <Link href="/contact">
+            Contact
+          </Link>
 
-  {!user && (
+        </nav>
 
-    <>
+        <div className="flex items-center gap-4">
 
-      <a
-        href="/login"
-        className="bg-white text-black px-4 py-2 rounded-xl font-semibold"
-      >
-        Login
-      </a>
+          {user ? (
 
-      <a
-        href="/signup"
-        className="bg-green-500 px-4 py-2 rounded-xl font-semibold"
-      >
-        Register
-      </a>
+            <>
+              <p className="text-green-400 text-sm">
+                {user.email}
+              </p>
 
-    </>
+              <button
+                onClick={async () => {
 
-  )}
+                  await signOut(auth);
 
-</div>
+                  localStorage.removeItem("userEmail");
+
+                  localStorage.removeItem("userName");
+
+                  window.location.href = "/";
+
+                }}
+                className="bg-red-500 px-5 py-2 rounded-xl font-semibold"
+              >
+                Logout
+              </button>
+            </>
+
+          ) : (
+
+            <>
+              <Link
+                href="/login"
+                className="bg-white text-black px-5 py-2 rounded-xl font-semibold"
+              >
+                Login
+              </Link>
+
+              <Link
+                href="/signup"
+                className="bg-green-500 px-5 py-2 rounded-xl font-semibold"
+              >
+                Register
+              </Link>
+            </>
+
+          )}
+
+        </div>
+
       </header>
 
-      {/* Hero Section */}
+      {/* HERO SECTION */}
+
       <section
-  id="home"
-  className="relative h-[80vh] bg-cover bg-center flex items-center justify-center"
+        id="home"
+        className="relative h-[70vh] bg-cover bg-center flex items-center justify-center"
         style={{
           backgroundImage:
             "url('https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=1600&auto=format&fit=crop')",
         }}
       >
+
         <div className="absolute inset-0 bg-black/60"></div>
 
-        <div className="relative z-10 text-center text-white px-4">
+        <div className="relative z-10 text-center text-white w-full px-6">
+
           <h2 className="text-5xl font-bold mb-6">
             Book Smart Parking in Bangalore
           </h2>
 
-          <p className="text-xl mb-8">
+          <p className="text-xl mb-10">
             Book monthly or yearly parking spaces instantly.
           </p>
 
-          <div className="bg-white rounded-3xl p-5 flex flex-col md:flex-row gap-4 max-w-4xl mx-auto">
-            <button
-  onClick={() => {
+          <div className="bg-white rounded-3xl p-5 flex flex-col md:flex-row gap-4 max-w-5xl mx-auto">
 
-    navigator.geolocation.getCurrentPosition((position) => {
-
-      setCurrentLocation(
-        `${position.coords.latitude}, ${position.coords.longitude}`
-      );
-
-    });
-
-  }}
-  className="bg-black text-white px-6 py-4 rounded-2xl font-bold"
->
-  Use Current Location
-</button>
             <input
-  type="text"
-  placeholder="Search by location"
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 px-5 py-4 rounded-2xl border text-black"
+              type="text"
+              placeholder="Search by location"
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              className="flex-1 border p-4 rounded-2xl text-black"
             />
 
-            <select className="px-5 py-4 rounded-2xl border text-black">
-              <option>Monthly</option>
-              <option>Yearly</option>
-            </select>
-
-            <button className="bg-green-500 text-white px-8 py-4 rounded-2xl font-bold">
+            <button className="bg-green-500 text-white px-10 py-4 rounded-2xl font-bold">
               Search Parking
             </button>
+
           </div>
-          {currentLocation && (
-  <p className="text-white mt-4 text-lg">
-    Current Location: {currentLocation}
-  </p>
-)}
+
         </div>
+
       </section>
 
-      {/* Parking Listings */}
-<section id="parking" className="py-20 px-6">
+      {/* PARKING LIST */}
 
-  <div className="max-w-7xl mx-auto">
+      <section
+        id="parking"
+        className="py-20 px-6"
+      >
 
-    <h2 className="text-4xl font-bold mb-10">
-      Available Parking Slots
-    </h2>
+        <div className="max-w-7xl mx-auto">
 
-    {loading ? (
+          <h2 className="text-5xl font-bold mb-12">
+            Available Parking Slots
+          </h2>
 
-      <h1 className="text-2xl font-bold">
-        Loading Parking Slots...
-      </h1>
+          {loading ? (
 
-    ) : (
+            <div className="text-center text-3xl font-bold py-20">
+              Loading Parking Slots...
+            </div>
 
-      <div className="grid md:grid-cols-3 gap-8">
+          ) : parkingSpots.length === 0 ? (
 
-        {parkingSpots
-          .filter((spot) =>
-            spot.location
-              ?.toLowerCase()
-              .includes(search.toLowerCase())
-          )
-          .map((spot) => (
+            <div className="text-center text-3xl font-bold text-red-500 py-20">
+              No Parking Slots Found
+            </div>
 
-            <div
-              key={spot.id}
-              className="bg-white rounded-3xl overflow-hidden shadow-lg"
-            >
+          ) : (
 
-              <img
-                src={
-                  spot.image ||
-                  "https://via.placeholder.com/400"
-                }
-                alt={spot.title}
-                className="h-60 w-full object-cover"
-              />
+            <div className="grid md:grid-cols-3 gap-8">
 
-              <div className="p-6">
+              {parkingSpots
+                .filter((spot) =>
+                  spot.location
+                    ?.toLowerCase()
+                    .includes(search.toLowerCase())
+                )
+                .map((spot) => (
 
-                <h3 className="text-2xl font-bold mb-2">
-                  {spot.title}
-                </h3>
+                  <div
+                    key={spot.id}
+                    className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition"
+                  >
 
-                <p className="text-gray-600 mb-4">
-                  {spot.location}
-                </p>
+                    <Image
+                      src={
+                        spot.image ||
+                        "https://via.placeholder.com/400"
+                      }
+                      alt={spot.title}
+                      width={500}
+                      height={300}
+                      className="h-60 w-full object-cover"
+                    />
 
-                <span
-                  className={`inline-block px-4 py-2 rounded-xl text-white font-semibold mb-4 ${
-                    spot.availability === "Available"
-                      ? "bg-green-500"
-                      : "bg-red-500"
-                  }`}
-                >
-                  {spot.availability}
-                </span>
+                    <div className="p-6">
 
-                <div className="flex justify-between mb-5">
+                      <h3 className="text-2xl font-bold mb-2">
+                        {spot.title}
+                      </h3>
 
-                  <div>
-                    <p className="text-sm text-gray-500">
-                      Monthly
-                    </p>
+                      <p className="text-gray-600 mb-4">
+                        {spot.location}
+                      </p>
 
-                    <p className="font-bold">
-                      ₹{spot.monthlyPrice}/month
-                    </p>
+                      <span
+                        className={`inline-block px-4 py-2 rounded-xl text-white font-semibold mb-4 ${
+                          spot.availability === "Available"
+                            ? "bg-green-500"
+                            : "bg-red-500"
+                        }`}
+                      >
+                        {spot.availability}
+                      </span>
+
+                      <div className="flex justify-between mb-6">
+
+                        <div>
+
+                          <p className="text-sm text-gray-500">
+                            Monthly
+                          </p>
+
+                          <p className="font-bold">
+                            ₹{spot.monthlyPrice}/month
+                          </p>
+
+                        </div>
+
+                        <div>
+
+                          <p className="text-sm text-gray-500">
+                            Yearly
+                          </p>
+
+                          <p className="font-bold">
+                            ₹30000/year
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                      <Link
+                        href={`/parking/${spot.id}`}
+                        className="block text-center bg-green-500 text-white py-3 rounded-2xl font-bold"
+                      >
+                        Book Now
+                      </Link>
+
+                    </div>
+
                   </div>
 
-                  <div>
-                    <p className="text-sm text-gray-500">
-                      Yearly
-                    </p>
-
-                    <p className="font-bold">
-                      ₹30000/year
-                    </p>
-                  </div>
-
-                </div>
-
-                <a
-                  href={`/parking/${spot.id}`}
-                  className="block text-center w-full bg-green-500 text-white py-3 rounded-2xl font-bold"
-                >
-                  Book Now
-                </a>
-
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${spot.location}`}
-                  target="_blank"
-                  className="block text-center w-full bg-black text-white py-3 rounded-2xl font-bold mt-3"
-                >
-                  Open in Maps
-                </a>
-
-              </div>
+                ))}
 
             </div>
 
-          ))}
+          )}
 
-      </div>
+        </div>
 
-    )}
+      </section>
 
-  </div>
+      {/* OWNER SECTION */}
 
-</section>
-
-      {/* Owner Section */}
       <section
-  id="owners"
-  className="py-20 px-6 bg-black text-white text-center"
->
+        id="owners"
+        className="bg-black text-white py-20 px-6 text-center"
+      >
+
         <div className="max-w-4xl mx-auto">
+
           <h2 className="text-5xl font-bold mb-6">
-            Earn Money From Your Empty Parking Space
+            Earn From Your Parking Space
           </h2>
 
           <p className="text-xl text-gray-300 mb-10">
-            List your unused parking slots and start earning monthly income.
+            List your empty parking slots and start earning.
           </p>
 
-          <a
-  href="/add-parking"
-  className="inline-block bg-green-500 px-10 py-5 rounded-2xl text-xl font-bold"
->
-  List Your Parking
-</a>
+          <Link
+            href="/add-parking"
+            className="inline-block bg-green-500 px-10 py-5 rounded-2xl text-xl font-bold"
+          >
+            List Your Parking
+          </Link>
+
         </div>
+
       </section>
 
-{/* Google Map */}
-<section className="py-20 px-6 bg-white">
+      {/* FOOTER */}
 
-  <div className="max-w-7xl mx-auto">
+      <footer className="bg-black text-white py-12 px-6">
 
-    <h2 className="text-4xl font-bold text-center mb-10">
-      Find Parking Near You
-    </h2>
+        <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-10">
 
-    <div className="rounded-3xl overflow-hidden shadow-2xl">
+          <div>
 
-      <iframe
-        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d62230.669928829875!2d77.5946!3d12.9716!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae1670c9b44ed9%3A0x3d9d4ce001f0d8d!2sBangalore!5e0!3m2!1sen!2sin!4v1710000000000!5m2!1sen!2sin"
-        width="100%"
-        height="500"
-        loading="lazy"
-        className="border-0"
-      ></iframe>
+            <h3 className="text-2xl font-bold mb-4">
+              CarParking Bangalore
+            </h3>
 
-    </div>
+            <p className="text-gray-400">
+              Smart parking marketplace for customers and owners.
+            </p>
 
-  </div>
+          </div>
 
-</section>
+          <div>
 
-{/* Footer */}
-<footer className="bg-black text-white py-12 px-6">
-  <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-10">
-    
-    <div>
-      <h3 className="text-2xl font-bold mb-4">
-        CarParking Bangalore
-      </h3>
+            <h4 className="font-bold mb-4">
+              Quick Links
+            </h4>
 
-      <p className="text-gray-400">
-        Smart parking marketplace for customers and parking owners.
-      </p>
-    </div>
+            <ul className="space-y-2 text-gray-400">
 
-    <div>
-      <h4 className="font-bold mb-4">Quick Links</h4>
+              <li>
+                <Link href="/">Home</Link>
+              </li>
 
-      <ul className="space-y-2 text-gray-400">
-        <li>
-  <a href="/">Home</a>
-</li>
+              <li>
+                <Link href="/bookings">
+                  Bookings
+                </Link>
+              </li>
 
-<li>
-  <a href="#parking">Search Parking</a>
-</li>
+              <li>
+                <Link href="/dashboard">
+                  Dashboard
+                </Link>
+              </li>
 
-<li>
-  <a href="/dashboard">Dashboard</a>
-</li>
+            </ul>
 
-<li>
-  <a href="/bookings">Bookings</a>
-</li>
-      </ul>
-    </div>
+          </div>
 
-    <div>
-      <h4 className="font-bold mb-4">For Owners</h4>
+          <div>
 
-     <ul className="space-y-2 text-gray-400">
+            <h4 className="font-bold mb-4">
+              Contact
+            </h4>
 
-  <li>
-    <a href="/add-parking">
-      List Parking
-    </a>
-  </li>
+            <ul className="space-y-2 text-gray-400">
 
-  <li>
-    <a href="/dashboard">
-      Owner Dashboard
-    </a>
-  </li>
+              <li>Bangalore, India</li>
 
-  <li>
-    <a href="/bookings">
-      Earnings
-    </a>
-  </li>
+              <li>
+                akhilnaidu19@gmail.com
+              </li>
 
-  <li>
-    <a href="/contact">
-      Support
-    </a>
-  </li>
+              <li>
+                +91 9206687300
+              </li>
 
-</ul>
-    </div>
+            </ul>
 
-    <div>
-      <h4 className="font-bold mb-4">Contact</h4>
+          </div>
 
-      <ul className="space-y-2 text-gray-400">
-        <li>Bangalore, India</li>
-        <li>akhilnaidu19@gmail.com</li>
-        <li>+91 9206687300</li>
-      </ul>
-    </div>
-  </div>
+        </div>
 
-  <div className="border-t border-gray-800 mt-10 pt-6 text-center text-gray-500">
-    © 2026 CarParking Bangalore. All rights reserved.
-  </div>
-</footer>
+        <div className="border-t border-gray-700 mt-10 pt-6 text-center text-gray-500">
+
+          © 2026 CarParking Bangalore
+
+        </div>
+
+      </footer>
 
     </div>
+
   );
+
 }
