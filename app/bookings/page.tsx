@@ -98,21 +98,29 @@ export default function BookingsPage() {
 
       console.log("Cancelling:", booking);
 
-      if (
-        booking.parkingId &&
-        booking.parkingId !== ""
-      ) {
+      try {
 
-        await updateDoc(
-          doc(db, "parkings", booking.parkingId),
-          {
-            availability: "Available",
-          }
-        );
+  if (
+    booking.parkingId &&
+    booking.parkingId !== ""
+  ) {
 
-        console.log("Parking Updated");
-
+    await updateDoc(
+      doc(db, "parkings", booking.parkingId),
+      {
+        availability: "Available",
       }
+    );
+
+    console.log("Parking Updated");
+
+  }
+
+} catch (error) {
+
+  console.log("Parking Update Skipped");
+
+}
 
       await deleteDoc(
         doc(db, "bookings", booking.id)
