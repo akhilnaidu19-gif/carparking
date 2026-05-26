@@ -83,7 +83,7 @@ const [time, setTime] = useState("");
       );
 
       const options = {
-  key: "rzp_test_StbVrnH5ksikrS",
+  key: "rzp_test_StsoQkPsUQ363R",
   amount: 50000,
   currency: "INR",
   name: "CarParking Bangalore",

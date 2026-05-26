@@ -102,7 +102,7 @@ export default function ParkingDetailsPage() {
       try {
 
         const options = {
-          key: "rzp_test_StbVrnH5ksikrS",
+          key: "rzp_test_StsoQkPsUQ363R",
           amount: 30000 * 100,
           currency: "INR",
           name: "CarParking Bangalore",
@@ -175,7 +175,7 @@ console.log(parking.id);
 
     const options = {
 
-      key: "rzp_test_StbVrnH5ksikrS",
+      key: "rzp_test_StsoQkPsUQ363R",
 
       amount: parseInt(parking.monthlyPrice) * 100,
 
