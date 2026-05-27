@@ -5,7 +5,10 @@ import Image from "next/image";
 
 import { useEffect, useState } from "react";
 
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+} from "firebase/firestore";
 
 import {
   getAuth,
@@ -20,12 +23,47 @@ export default function Home() {
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
 
   const [search, setSearch] = useState("");
+  const [userLatitude, setUserLatitude] = useState<any>(null);
+
+const [userLongitude, setUserLongitude] = useState<any>(null);
 
   const [user, setUser] = useState<any>(null);
 
   const [loading, setLoading] = useState(true);
 
   const auth = getAuth(app);
+  const calculateDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) => {
+
+  const R = 6371;
+
+  const dLat =
+    ((lat2 - lat1) * Math.PI) / 180;
+
+  const dLon =
+    ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) *
+      Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c =
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+
+  return R * c;
+};
 
   // AUTH STATE
   useEffect(() => {
@@ -46,44 +84,47 @@ export default function Home() {
   // FETCH PARKINGS
   useEffect(() => {
 
-    const fetchParkings = async () => {
+  setLoading(true);
 
-      try {
+  const unsubscribe = onSnapshot(
 
-        setLoading(true);
+    collection(db, "parkings"),
 
-        const querySnapshot = await getDocs(
-          collection(db, "parkings")
-        );
+    (snapshot) => {
 
-        const parkingData: any[] = [];
+      const parkingData: any[] = [];
 
-        querySnapshot.forEach((doc) => {
+      snapshot.forEach((doc) => {
 
-          parkingData.push({
-            id: doc.id,
-            ...doc.data(),
-          });
+        parkingData.push({
+
+          id: doc.id,
+
+          ...doc.data(),
 
         });
 
-        setParkingSpots(parkingData);
+      });
 
-      } catch (error) {
+      setParkingSpots(parkingData);
 
-        console.log(error);
+      setLoading(false);
 
-      } finally {
+    },
 
-        setLoading(false);
+    (error) => {
 
-      }
+      console.log(error);
 
-    };
+      setLoading(false);
 
-    fetchParkings();
+    }
 
-  }, []);
+  );
+
+  return () => unsubscribe();
+
+}, []);
 
   return (
 
@@ -116,9 +157,67 @@ export default function Home() {
           {user ? (
 
             <>
-              <p className="text-green-400 text-sm">
-                {user.email}
-              </p>
+              <div className="relative group">
+
+  <img
+    src={
+      user.photoURL ||
+      "https://via.placeholder.com/50"
+    }
+    className="w-12 h-12 rounded-full object-cover border-2 border-green-500 cursor-pointer"
+  />
+
+  <div className="absolute right-0 mt-3 w-64 bg-white text-black rounded-2xl shadow-2xl p-5 hidden group-hover:block z-50">
+
+    <div className="flex items-center gap-3 mb-4">
+
+      <img
+        src={
+          user.photoURL ||
+          "https://via.placeholder.com/50"
+        }
+        className="w-14 h-14 rounded-full object-cover"
+      />
+
+      <div>
+
+        <h3 className="font-bold">
+          {user.displayName || "User"}
+        </h3>
+
+        <p className="text-sm text-gray-500">
+          {user.email}
+        </p>
+
+      </div>
+
+    </div>
+
+    <Link
+      href="/profile"
+      className="block bg-green-500 text-white text-center py-3 rounded-2xl font-bold mb-3"
+    >
+      My Profile
+    </Link>
+
+    <button
+      onClick={async () => {
+
+        await signOut(auth);
+
+        localStorage.clear();
+
+        window.location.href = "/";
+
+      }}
+      className="w-full bg-red-500 text-white py-3 rounded-2xl font-bold"
+    >
+      Logout
+    </button>
+
+  </div>
+
+</div>
 
               <button
                 onClick={async () => {
@@ -200,6 +299,58 @@ export default function Home() {
             <button className="bg-green-500 text-white px-10 py-4 rounded-2xl font-bold">
               Search Parking
             </button>
+            <button
+  onClick={() => {
+
+    if (!navigator.geolocation) {
+
+      alert("Geolocation is not supported");
+
+      return;
+
+    }
+
+    navigator.geolocation.getCurrentPosition(
+
+      (position) => {
+
+        console.log(position);
+
+        setUserLatitude(
+          position.coords.latitude
+        );
+
+        setUserLongitude(
+          position.coords.longitude
+        );
+
+        alert("Location Captured Successfully");
+
+      },
+
+      (error) => {
+
+        console.log(error);
+
+        alert(
+          "Please allow location permission"
+        );
+
+      },
+
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+
+    );
+
+  }}
+  className="bg-black text-white px-6 py-4 rounded-2xl font-bold"
+>
+  Use Current Location
+</button>
 
           </div>
 
@@ -237,12 +388,44 @@ export default function Home() {
             <div className="grid md:grid-cols-3 gap-8">
 
               {parkingSpots
-                .filter((spot) =>
-                  spot.location
-                    ?.toLowerCase()
-                    .includes(search.toLowerCase())
-                )
-                .map((spot) => (
+  .filter((spot) =>
+    spot.location
+      ?.toLowerCase()
+      .includes(search.toLowerCase())
+  )
+
+  .sort((a, b) => {
+
+    if (
+      !userLatitude ||
+      !userLongitude
+    ) {
+
+      return 0;
+
+    }
+
+    const distanceA =
+      calculateDistance(
+        Number(userLatitude),
+        Number(userLongitude),
+        Number(a.latitude),
+        Number(a.longitude)
+      );
+
+    const distanceB =
+      calculateDistance(
+        Number(userLatitude),
+        Number(userLongitude),
+        Number(b.latitude),
+        Number(b.longitude)
+      );
+
+    return distanceA - distanceB;
+
+  })
+
+  .map((spot) => (
 
                   <div
                     key={spot.id}
@@ -266,9 +449,31 @@ export default function Home() {
                         {spot.title}
                       </h3>
 
-                      <p className="text-gray-600 mb-4">
-                        {spot.location}
-                      </p>
+                      <div className="mb-4">
+
+  <p className="text-gray-600">
+    {spot.location}
+  </p>
+
+  {userLatitude &&
+    userLongitude &&
+    spot.latitude &&
+    spot.longitude && (
+
+      <p className="text-green-600 font-bold mt-2">
+
+        {calculateDistance(
+          Number(userLatitude),
+          Number(userLongitude),
+          Number(spot.latitude),
+          Number(spot.longitude)
+        ).toFixed(1)} km away
+
+      </p>
+
+    )}
+
+</div>
 
                       <span
                         className={`inline-block px-4 py-2 rounded-xl text-white font-semibold mb-4 ${
@@ -308,12 +513,31 @@ export default function Home() {
 
                       </div>
 
-                      <Link
-                        href={`/parking/${spot.id}`}
-                        className="block text-center bg-green-500 text-white py-3 rounded-2xl font-bold"
-                      >
-                        Book Now
-                      </Link>
+                      <div className="flex gap-3">
+
+  <Link
+    href={`/parking/${spot.id}`}
+    className="flex-1 text-center bg-green-500 text-white py-3 rounded-2xl font-bold"
+  >
+    Book Now
+  </Link>
+
+  <a
+  href={
+    spot.latitude && spot.longitude
+      ? `https://www.google.com/maps?q=${spot.latitude},${spot.longitude}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          spot.location
+        )}`
+  }
+  target="_blank"
+  rel="noopener noreferrer"
+  className="flex-1 text-center bg-black text-white py-3 rounded-2xl font-bold"
+>
+  View Map
+</a>
+
+</div>
 
                     </div>
 

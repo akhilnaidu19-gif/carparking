@@ -64,119 +64,199 @@ export default function BookingsPage() {
 
         <div className="grid gap-6">
 
-          {bookings.map((booking) => (
+          {bookings.map((booking) => (<div
+  key={booking.id}
+  className="bg-white rounded-3xl shadow-xl overflow-hidden"
+>
 
-            <div
-              key={booking.id}
-              className="bg-white p-8 rounded-3xl shadow-lg"
-            >
+  <img
+    src={booking.image}
+    alt={booking.title}
+    className="w-full h-72 object-cover"
+  />
 
-              <img
-  src={booking.image}
-  alt={booking.title}
-  className="w-full h-60 object-cover rounded-2xl mb-6"
-/>
+  <div className="p-8">
 
-<h2 className="text-3xl font-bold mb-3">
-  {booking.title}
-</h2>
+    <div className="flex justify-between items-start mb-6">
 
-              <p className="text-gray-600 mb-2">
-                Booking ID: {booking.id}
-              </p>
+      <div>
 
-              <p className="text-gray-600 mb-2">
-                Name: {booking.name || "N/A"}
-              </p>
+        <h2 className="text-4xl font-bold mb-2">
+          {booking.title}
+        </h2>
 
-              <p className="text-gray-600 mb-2">
-                Email: {booking.email || "N/A"}
-              </p>
+        <p className="text-gray-500 text-lg">
+          {booking.location}
+        </p>
 
-              <p className="text-gray-600 mb-2">
-  Owner: {booking.owner || "N/A"}
-</p>
+      </div>
 
-              <p className="text-gray-600 mb-2">
-  Plan: {booking.plan || "N/A"}
-</p>
+      <span
+        className={`px-5 py-3 rounded-2xl text-white font-bold ${
+          booking.paymentStatus === "Paid"
+            ? "bg-green-500"
+            : "bg-red-500"
+        }`}
+      >
+        {booking.paymentStatus}
+      </span>
 
-<p className="text-gray-600 mb-2">
-  Booking Date: {booking.bookingDate || "N/A"}
-</p>
+    </div>
 
-<p className="text-gray-600 mb-2">
-  Booking Time: {booking.bookingTime || "N/A"}
-</p>
+    {/* OWNER */}
 
-<p className="text-gray-600 mb-4">
-  Valid Till: {booking.validTill || "N/A"}
-</p>
+    <div className="bg-gray-100 rounded-3xl p-5 flex items-center gap-5 mb-8">
 
-              <span className="bg-green-500 text-white px-4 py-2 rounded-xl">
-                {booking.paymentStatus}
-              </span>
+      <img
+        src={
+          booking.ownerPhoto ||
+          "https://via.placeholder.com/100"
+        }
+        className="w-20 h-20 rounded-full object-cover"
+      />
 
-              <button
+      <div>
 
-                onClick={async () => {
+        <h3 className="text-2xl font-bold">
+          {booking.owner || "Owner"}
+        </h3>
 
-                  try {
+        <p className="text-gray-500">
+          Parking Owner
+        </p>
 
-                    console.log("Cancelling:", booking);
+      </div>
 
-                    try {
+    </div>
 
-                      if (
-                        booking.parkingId &&
-                        booking.parkingId !== ""
-                      ) {
+    {/* DETAILS */}
 
-                        await updateDoc(
-                          doc(db, "parkings", booking.parkingId),
-                          {
-                            availability: "Available",
-                          }
-                        );
+    <div className="grid md:grid-cols-2 gap-5 mb-8">
 
-                        console.log("Parking Updated");
+      <div className="bg-gray-100 p-5 rounded-2xl">
 
-                      }
+        <p className="text-gray-500 mb-1">
+          Booking ID
+        </p>
 
-                    } catch (error) {
+        <p className="font-bold">
+          {booking.id}
+        </p>
 
-                      console.log("Parking Update Skipped");
+      </div>
 
-                    }
+      <div className="bg-gray-100 p-5 rounded-2xl">
 
-                    await deleteDoc(
-                      doc(db, "bookings", booking.id)
-                    );
+        <p className="text-gray-500 mb-1">
+          Plan
+        </p>
 
-                    console.log("Booking Deleted");
+        <p className="font-bold">
+          {booking.plan}
+        </p>
 
-                    setBookings(
-                      bookings.filter(
-                        (item) => item.id !== booking.id
-                      )
-                    );
+      </div>
 
-                    alert("Booking Cancelled");
+      <div className="bg-gray-100 p-5 rounded-2xl">
 
-                  } catch (error) {
+        <p className="text-gray-500 mb-1">
+          Booking Date
+        </p>
 
-                    console.log("CANCEL ERROR:", error);
+        <p className="font-bold">
+          {booking.bookingDate}
+        </p>
 
-                  }
+      </div>
 
-                }}
+      <div className="bg-gray-100 p-5 rounded-2xl">
 
-                className="bg-red-500 text-white px-4 py-2 rounded-xl ml-4"
-              >
-                Cancel Booking
-              </button>
+        <p className="text-gray-500 mb-1">
+          Valid Till
+        </p>
 
-            </div>
+        <p className="font-bold">
+          {booking.validTill}
+        </p>
+
+      </div>
+
+    </div>
+
+    {/* ACTIONS */}
+
+    <div className="flex flex-col md:flex-row gap-4">
+
+      <a
+        href={
+          booking.latitude &&
+          booking.longitude
+            ? `https://www.google.com/maps?q=${booking.latitude},${booking.longitude}`
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                booking.location
+              )}`
+        }
+        target="_blank"
+        className="flex-1 bg-black text-white py-4 rounded-2xl font-bold text-center"
+      >
+        Open Location
+      </a>
+
+      <button
+
+        onClick={async () => {
+
+          try {
+
+            if (
+              booking.parkingId &&
+              booking.parkingId !== ""
+            ) {
+
+              await updateDoc(
+                doc(
+                  db,
+                  "parkings",
+                  booking.parkingId
+                ),
+                {
+                  availability: "Available",
+                }
+              );
+
+            }
+
+            await deleteDoc(
+              doc(db, "bookings", booking.id)
+            );
+
+            setBookings(
+              bookings.filter(
+                (item) =>
+                  item.id !== booking.id
+              )
+            );
+
+            alert("Booking Cancelled");
+
+          } catch (error) {
+
+            console.log(error);
+
+          }
+
+        }}
+
+        className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-bold"
+      >
+        Cancel Booking
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
 
           ))}
 
