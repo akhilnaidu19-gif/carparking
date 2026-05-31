@@ -12,6 +12,9 @@ import {
   updateDoc,
   addDoc,
   collection,
+  onSnapshot,
+  query,
+  where,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -20,7 +23,25 @@ export default function ParkingDetailsPage() {
 
   const params = useParams();
 
-  const [parking, setParking] = useState<any>(null);
+  const [parking, setParking] =
+    useState<any>(null);
+
+  const [reviews, setReviews] =
+    useState<any[]>([]);
+
+  const [rating, setRating] =
+    useState(5);
+
+  const [reviewText, setReviewText] =
+    useState("");
+
+  const [wishlist, setWishlist] =
+    useState(false);
+
+  const [submittingReview, setSubmittingReview] =
+    useState(false);
+
+  // FETCH PARKING
 
   useEffect(() => {
 
@@ -32,14 +53,22 @@ export default function ParkingDetailsPage() {
         params.id as string
       );
 
-      const docSnap = await getDoc(docRef);
+      const docSnap =
+        await getDoc(docRef);
 
       if (docSnap.exists()) {
 
-        setParking({
+        const parkingData: any = {
+
           id: docSnap.id,
+
           ...docSnap.data(),
-        });
+
+        };
+
+        setParking(
+          parkingData
+        );
 
       }
 
@@ -49,73 +78,394 @@ export default function ParkingDetailsPage() {
 
   }, []);
 
+  // FETCH REVIEWS
+
+  useEffect(() => {
+
+    if (!params.id) return;
+
+    const q = query(
+
+      collection(
+        db,
+        "reviews"
+      ),
+
+      where(
+        "parkingId",
+        "==",
+        params.id
+      )
+
+    );
+
+    const unsubscribe =
+      onSnapshot(
+
+        q,
+
+        (snapshot) => {
+
+          const reviewData: any[] =
+            [];
+
+          snapshot.forEach((doc) => {
+
+            reviewData.push({
+
+              id: doc.id,
+
+              ...doc.data(),
+
+            });
+
+          });
+
+          setReviews(
+            reviewData
+          );
+
+        }
+
+      );
+
+    return () => unsubscribe();
+
+  }, [params.id]);
+
   if (!parking) {
-    return <h1 className="p-10">Loading...</h1>;
+
+    return (
+
+      <h1 className="p-10 text-3xl font-bold">
+
+        Loading...
+
+      </h1>
+
+    );
+
   }
 
-  const handleBooking = async (plan: string) => {
+  // AVERAGE RATING
+
+  const averageRating =
+
+    reviews.length > 0
+
+      ? (
+          reviews.reduce(
+
+            (acc, item) =>
+
+              acc +
+              Number(
+                item.rating
+              ),
+
+            0
+
+          ) / reviews.length
+
+        ).toFixed(1)
+
+      : "0";
+
+  // BOOKING WITH RAZORPAY
+
+  const handleBooking = async (
+    plan: string
+  ) => {
 
     try {
 
-      await addDoc(collection(db, "bookings"), {
+      const userEmail =
+        localStorage.getItem(
+          "userEmail"
+        );
 
-  parkingId: parking.id,
+      const userName =
+        localStorage.getItem(
+          "userName"
+        );
 
-  title: parking.title,
+      if (!userEmail) {
 
-  image: parking.image,
+        alert(
+          "Please login first"
+        );
 
-  owner: parking.owner || "Parking Owner",
-  ownerPhoto: parking.ownerPhoto,
+        return;
 
-  latitude: parking.latitude,
+      }
 
-  longitude: parking.longitude,
+      if (
+        parking.availability ===
+        "Occupied"
+      ) {
 
-  location: parking.location,
+        alert(
+          "Parking Already Occupied"
+        );
 
-  paymentStatus: "Paid",
+        return;
 
-  plan: plan,
+      }
 
-  email: localStorage.getItem("userEmail"),
+      const amount =
 
-  name: localStorage.getItem("userName"),
+        plan === "Monthly"
 
-  bookingDate: new Date().toLocaleDateString(),
+          ? Number(
+              parking.monthlyPrice
+            )
 
-  bookingTime: new Date().toLocaleTimeString(),
+          : 30000;
 
-  validTill:
-    plan === "Monthly"
-      ? new Date(
-          Date.now() +
-            30 * 24 * 60 * 60 * 1000
-        ).toLocaleDateString()
-      : new Date(
-          Date.now() +
-            365 * 24 * 60 * 60 * 1000
-        ).toLocaleDateString(),
+      const options = {
 
-});
+        key: process.env
+          .NEXT_PUBLIC_RAZORPAY_KEY_ID,
 
-      await updateDoc(
-        doc(db, "parkings", parking.id),
-        {
-          availability: "Occupied",
-        }
-      );
+        amount:
+          amount * 100,
 
-      setParking({
-        ...parking,
-        availability: "Occupied",
-      });
+        currency: "INR",
 
-      alert(`${plan} Parking Booked`);
+        name:
+          "CarParking Bangalore",
+
+        description:
+          `${plan} Parking Booking`,
+
+        image:
+          parking.image,
+
+        handler:
+          async function (
+            response: any
+          ) {
+
+            try {
+
+              // SAVE BOOKING
+
+              await addDoc(
+
+                collection(
+                  db,
+                  "bookings"
+                ),
+
+                {
+  ownerPhone:
+    parking.ownerPhone || "",
+
+  ownerEmail:
+    parking.ownerEmail || "",
+
+  parkingId:
+    parking.id,
+
+  title:
+    parking.title,
+
+  image:
+    parking.image
+      ? parking.image
+      : "",
+
+  owner:
+    parking.ownerName
+      ? parking.ownerName
+      : "Parking Owner",
+
+  ownerPhoto:
+    parking.ownerPhoto
+      ? parking.ownerPhoto
+      : "",
+
+
+                  location:
+  parking.location
+    ? parking.location
+    : "",
+
+                  latitude:
+  parking.latitude
+    ? parking.latitude
+    : "",
+
+longitude:
+  parking.longitude
+    ? parking.longitude
+    : "",
+
+                  paymentId:
+                    response.razorpay_payment_id,
+
+                  paymentStatus:
+                    "Paid",
+
+                  amount,
+
+                  plan,
+
+                  email:
+  userEmail,
+
+name:
+  userName,
+
+phone:
+  localStorage.getItem(
+    "userPhone"
+  ) || "",
+
+                  bookingDate:
+                    new Date().toLocaleDateString(),
+
+                  bookingTime:
+                    new Date().toLocaleTimeString(),
+
+                  validTill:
+
+                    plan ===
+                    "Monthly"
+
+                      ? new Date(
+
+                          Date.now() +
+
+                            30 *
+                              24 *
+                              60 *
+                              60 *
+                              1000
+
+                        ).toLocaleDateString()
+
+                      : new Date(
+
+                          Date.now() +
+
+                            365 *
+                              24 *
+                              60 *
+                              60 *
+                              1000
+
+                        ).toLocaleDateString(),
+
+                }
+
+              );
+
+              await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    ownerEmail:
+      parking.ownerEmail || "",
+
+    title:
+      "New Booking",
+
+    message:
+      `${userName} booked ${parking.title}`,
+
+    createdAt:
+      new Date(),
+
+    read: false,
+
+  }
+
+);
+
+              // UPDATE PARKING
+
+              await updateDoc(
+
+                doc(
+                  db,
+                  "parkings",
+                  parking.id
+                ),
+
+                {
+
+                  availability:
+                    "Occupied",
+
+                }
+
+              );
+
+              setParking({
+
+                ...parking,
+
+                availability:
+                  "Occupied",
+
+              });
+
+              alert(
+                "Payment Successful & Booking Confirmed"
+              );
+
+           } catch (error: any) {
+
+  console.log(
+    "BOOKING ERROR:",
+    error
+  );
+
+  alert(
+    error.message ||
+    "Booking Failed"
+  );
+
+}
+
+          },
+
+        prefill: {
+
+          name:
+            userName || "",
+
+          email:
+            userEmail || "",
+
+        },
+
+        theme: {
+
+          color: "#16a34a",
+
+        },
+
+      };
+
+      const razorpay = new (window as any)
+        .Razorpay(options);
+
+      razorpay.open();
 
     } catch (error) {
 
       console.log(error);
+
+      alert(
+        "Payment Failed"
+      );
 
     }
 
@@ -129,386 +479,640 @@ export default function ParkingDetailsPage() {
 
       <div className="min-h-screen bg-gray-100">
 
+        {/* HERO IMAGE */}
+
         <div
-          className="h-[400px] bg-cover bg-center"
+          className="h-[450px] bg-cover bg-center relative"
           style={{
             backgroundImage: `url(${parking.image})`,
           }}
-        ></div>
+        >
+
+          <div className="absolute inset-0 bg-black/40"></div>
+
+          {/* WISHLIST */}
+
+          <button
+
+            onClick={() =>
+              setWishlist(
+                !wishlist
+              )
+            }
+
+            className="absolute top-8 right-8 bg-white w-16 h-16 rounded-full text-3xl shadow-2xl z-10"
+
+          >
+
+            {wishlist
+              ? "❤️"
+              : "🤍"}
+
+          </button>
+
+        </div>
 
         <div className="max-w-6xl mx-auto px-6 py-12">
 
+          {/* BADGES */}
+
+          <div className="flex flex-wrap gap-4 mb-6">
+
+            {parking.featured && (
+
+              <span className="bg-purple-600 text-white px-5 py-2 rounded-2xl font-bold">
+
+                Featured
+
+              </span>
+
+            )}
+
+            {parking.verified && (
+
+              <span className="bg-blue-500 text-white px-5 py-2 rounded-2xl font-bold">
+
+                Verified Owner
+
+              </span>
+
+            )}
+
+            <span
+              className={`px-5 py-2 rounded-2xl text-white font-bold ${
+                parking.availability ===
+                "Available"
+                  ? "bg-green-500"
+                  : "bg-red-500"
+              }`}
+            >
+
+              {
+                parking.availability
+              }
+
+            </span>
+
+          </div>
+
+          {/* TITLE */}
+
           <h1 className="text-5xl font-bold mb-4">
+
             {parking.title}
+
           </h1>
+
+          {/* LOCATION */}
+
+          <p className="text-gray-600 text-2xl mb-4">
+
+            {parking.location}
+
+          </p>
+
+          {/* RATING */}
+
+          <div className="flex items-center gap-4 mb-8">
+
+            <div className="bg-yellow-400 px-5 py-3 rounded-2xl font-bold text-xl">
+
+              ⭐ {averageRating}
+
+            </div>
+
+            <p className="text-gray-500 text-lg">
+
+              {reviews.length}
+              Reviews
+
+            </p>
+
+          </div>
+
+          {/* OWNER */}
 
           <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 flex items-center gap-5">
 
-  <img
-    src={
-      parking.ownerPhoto ||
-      "https://via.placeholder.com/100"
-    }
-    className="w-20 h-20 rounded-full object-cover"
-  />
+            <img
+              src={
+                parking.ownerPhoto ||
+                "https://via.placeholder.com/100"
+              }
+              className="w-20 h-20 rounded-full object-cover"
+            />
 
-  <div>
+            <div>
 
-    <h2 className="text-2xl font-bold">
+              <h2 className="text-2xl font-bold">
 
-      {parking.ownerName}
+                {parking.ownerName}
 
-    </h2>
+              </h2>
 
-    <p className="text-gray-600">
+              <p className="text-gray-600">
 
-      {parking.ownerCity}
+                {parking.ownerCity}
 
-    </p>
+              </p>
 
-    <p className="text-green-600 font-bold">
+              <p className="text-green-600 font-bold">
 
-      {parking.ownerPhone}
+                {parking.ownerPhone}
 
-    </p>
+              </p>
 
-  </div>
+            </div>
 
-</div>
+          </div>
 
-          <p className="text-gray-600 text-xl mb-6">
-  {parking.location}
-</p>
+          {/* BUTTONS */}
 
-<div className="flex flex-col md:flex-row gap-4 mb-8">
+          <div className="flex flex-col md:flex-row gap-4 mb-8">
 
-  <span
-    className={`inline-block px-6 py-3 rounded-2xl text-white font-semibold ${
-      parking.availability === "Available"
-        ? "bg-green-500"
-        : "bg-red-500"
-    }`}
-  >
+            <a
+              href={
+                parking.latitude &&
+                parking.longitude
+                  ? `https://www.google.com/maps?q=${parking.latitude},${parking.longitude}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      parking.location
+                    )}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-black text-white px-6 py-4 rounded-2xl font-bold text-center"
+            >
 
-    {parking.availability}
+              Open Exact Location
 
-  </span>
+            </a>
 
-  <a
-    href={
-      parking.latitude &&
-      parking.longitude
-        ? `https://www.google.com/maps?q=${parking.latitude},${parking.longitude}`
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-            parking.location
-          )}`
-    }
-    target="_blank"
-    rel="noopener noreferrer"
-    className="inline-block bg-black text-white px-6 py-3 rounded-2xl font-bold text-center"
-  >
+          </div>
 
-    Open Exact Location
+          {/* MAP */}
 
-  </a>
+          {parking.latitude &&
+            parking.longitude && (
 
-</div>
-            <div className="bg-white p-8 rounded-3xl shadow-lg mb-8">
+              <div className="bg-white p-6 rounded-3xl shadow-lg mb-8">
 
-  <h2 className="text-3xl font-bold mb-4">
+                <h2 className="text-3xl font-bold mb-6">
 
-    Parking Details
+                  Parking Location
 
-  </h2>
+                </h2>
 
-  <p className="text-gray-700 text-lg mb-4">
+                <iframe
+                  src={`https://maps.google.com/maps?q=${parking.latitude},${parking.longitude}&z=15&output=embed`}
+                  width="100%"
+                  height="400"
+                  style={{
+                    border: 0,
+                    borderRadius:
+                      "20px",
+                  }}
+                  loading="lazy"
+                ></iframe>
 
-    {parking.description}
+              </div>
 
-  </p>
+            )}
 
-  <div className="grid md:grid-cols-2 gap-4">
+          {/* DETAILS */}
 
-    <div className="bg-gray-100 p-4 rounded-2xl">
+          <div className="bg-white p-8 rounded-3xl shadow-lg mb-8">
 
-      <p className="font-bold">
-        Parking Type
-      </p>
+            <h2 className="text-3xl font-bold mb-4">
 
-      <p>
-        {parking.parkingType}
-      </p>
+              Parking Details
 
-    </div>
+            </h2>
 
-    <div className="bg-gray-100 p-4 rounded-2xl">
+            <p className="text-gray-700 text-lg mb-6">
 
-      <p className="font-bold">
-        CCTV
-      </p>
+              {parking.description}
 
-      <p>
-        {parking.cctv}
-      </p>
+            </p>
 
-    </div>
+            <div className="grid md:grid-cols-2 gap-4">
 
-  </div>
+              <div className="bg-gray-100 p-4 rounded-2xl">
 
-</div>
-          
+                <p className="font-bold">
+                  Parking Type
+                </p>
+
+                <p>
+                  {
+                    parking.parkingType
+                  }
+                </p>
+
+              </div>
+
+              <div className="bg-gray-100 p-4 rounded-2xl">
+
+                <p className="font-bold">
+                  CCTV
+                </p>
+
+                <p>
+                  {parking.cctv}
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* PLANS */}
+
           <div className="grid md:grid-cols-2 gap-6 mb-10">
 
-            {/* Monthly Plan */}
+            {/* MONTHLY */}
 
             <div className="bg-white p-8 rounded-3xl shadow-lg">
 
               <h2 className="text-2xl font-bold mb-4">
+
                 Monthly Plan
+
               </h2>
 
               <p className="text-4xl font-bold text-green-600 mb-4">
-                ₹{parking.monthlyPrice}/month
+
+                ₹
+                {
+                  parking.monthlyPrice
+                }
+                /month
+
               </p>
 
               <button
 
-  onClick={async () => {
+                onClick={() =>
+                  handleBooking(
+                    "Monthly"
+                  )
+                }
 
-    try {
+                disabled={
+                  parking.availability ===
+                  "Occupied"
+                }
 
-      const response = await fetch(
-        "/api/create-order",
-        {
-          method: "POST",
+                className="w-full bg-green-500 text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+              >
 
-          body: JSON.stringify({
-            amount:
-              Number(
-                parking.monthlyPrice
-              ),
-          }),
-        }
-      );
+                {parking.availability ===
+                "Occupied"
 
-      const order =
-        await response.json();
-
-      const options = {
-
-        key:
-          process.env
-            .NEXT_PUBLIC_RAZORPAY_KEY_ID,
-
-        amount: order.amount,
-
-        currency: order.currency,
-
-        order_id: order.id,
-
-        name:
-          "CarParking Bangalore",
-
-        description:
-          "Monthly Parking Booking",
-
-        handler:
-          async function (
-            response: any
-          ) {
-
-            console.log(
-              "PAYMENT SUCCESS",
-              response
-            );
-
-            await handleBooking(
-              "Monthly"
-            );
-
-          },
-
-        prefill: {
-
-          name:
-            localStorage.getItem(
-              "userName"
-            ) || "",
-
-          email:
-            localStorage.getItem(
-              "userEmail"
-            ) || "",
-
-        },
-
-        theme: {
-
-          color: "#22c55e",
-
-        },
-
-      };
-
-      const razorpay =
-        new (window as any).Razorpay(
-          options
-        );
-
-      razorpay.open();
-
-    } catch (error) {
-
-      console.log(error);
-
-      alert(
-        "Payment Failed"
-      );
-
-    }
-
-  }}
-
-  disabled={
-    parking.availability === "Occupied"
-  }
-
-  className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold disabled:bg-gray-400"
->
-                {parking.availability === "Occupied"
                   ? "Already Occupied"
+
                   : "Book Monthly"}
+
               </button>
 
             </div>
 
-            {/* Yearly Plan */}
+            {/* YEARLY */}
 
             <div className="bg-white p-8 rounded-3xl shadow-lg">
 
               <h2 className="text-2xl font-bold mb-4">
+
                 Yearly Plan
+
               </h2>
 
               <p className="text-4xl font-bold text-black mb-4">
+
                 ₹30000/year
+
               </p>
 
               <button
 
-  onClick={async () => {
+                onClick={() =>
+                  handleBooking(
+                    "Yearly"
+                  )
+                }
 
-    try {
+                disabled={
+                  parking.availability ===
+                  "Occupied"
+                }
 
-      const response = await fetch(
-        "/api/create-order",
-        {
-          method: "POST",
+                className="w-full bg-black text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+              >
 
-          body: JSON.stringify({
-            amount: 30000,
-          }),
-        }
-      );
+                {parking.availability ===
+                "Occupied"
 
-      const order =
-        await response.json();
+                  ? "Already Occupied"
 
-      const options = {
+                  : "Book Yearly"}
 
-        key:
-          process.env
-            .NEXT_PUBLIC_RAZORPAY_KEY_ID,
+              </button>
 
-        amount: order.amount,
+            </div>
 
-        currency: order.currency,
+          </div>
 
-        order_id: order.id,
+          {/* REVIEWS */}
 
-        name:
-          "CarParking Bangalore",
+          <div className="bg-white p-8 rounded-3xl shadow-lg">
 
-        description:
-          "Yearly Parking Booking",
+            <div className="flex items-center justify-between mb-8">
 
-        handler:
-          async function (
-            response: any
-          ) {
+              <div>
 
-            console.log(
-              "PAYMENT SUCCESS",
-              response
-            );
+                <h2 className="text-3xl font-bold">
 
-            await handleBooking(
-              "Yearly"
-            );
+                  Reviews & Ratings
 
-          },
+                </h2>
 
-        prefill: {
+                <p className="text-gray-500">
 
-          name:
-            localStorage.getItem(
-              "userName"
-            ) || "",
+                  {reviews.length}
+                  Reviews
 
-          email:
-            localStorage.getItem(
-              "userEmail"
-            ) || "",
+                </p>
 
-        },
+              </div>
 
-        theme: {
+              <div className="bg-green-500 text-white px-6 py-4 rounded-2xl text-center">
 
-          color: "#000000",
+                <h2 className="text-4xl font-bold">
 
-        },
+                  {
+                    averageRating
+                  }
 
-      };
+                </h2>
 
-      const razorpay =
-        new (window as any).Razorpay(
-          options
-        );
+                <p>
+                  Rating
+                </p>
 
-      razorpay.open();
+              </div>
 
-    } catch (error) {
+            </div>
 
-      console.log(error);
+            {/* REVIEW FORM */}
 
-      alert(
-        "Payment Failed"
-      );
+            <div className="border p-6 rounded-3xl mb-8">
 
-    }
+              <h3 className="text-2xl font-bold mb-5">
 
-  }}
+                Add Review
 
-  disabled={
-    parking.availability === "Occupied"
+              </h3>
+
+              <select
+                value={rating}
+                onChange={(e) =>
+                  setRating(
+                    Number(
+                      e.target.value
+                    )
+                  )
+                }
+                className="border p-4 rounded-2xl w-full mb-5"
+              >
+
+                <option value={5}>
+                  ⭐⭐⭐⭐⭐
+                </option>
+
+                <option value={4}>
+                  ⭐⭐⭐⭐
+                </option>
+
+                <option value={3}>
+                  ⭐⭐⭐
+                </option>
+
+                <option value={2}>
+                  ⭐⭐
+                </option>
+
+                <option value={1}>
+                  ⭐
+                </option>
+
+              </select>
+
+              <textarea
+                placeholder="Write review..."
+                value={
+                  reviewText
+                }
+                onChange={(e) =>
+                  setReviewText(
+                    e.target.value
+                  )
+                }
+                className="border p-4 rounded-2xl w-full h-32 mb-5"
+              ></textarea>
+
+              <button
+
+                onClick={async () => {
+
+                  try {
+
+                    setSubmittingReview(
+                      true
+                    );
+
+                    await addDoc(
+
+                      collection(
+                        db,
+                        "reviews"
+                      ),
+
+                      {
+
+                        parkingId:
+                          parking.id,
+
+                        userName:
+                          localStorage.getItem(
+                            "userName"
+                          ) || "User",
+
+                        userEmail:
+                          localStorage.getItem(
+                            "userEmail"
+                          ) || "",
+
+                        review:
+                          reviewText,
+
+                        rating,
+
+                        createdAt:
+                          new Date(),
+
+                      }
+
+                    );
+
+                    await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    ownerEmail:
+      parking.ownerEmail || "",
+
+    title:
+      "New Review",
+
+    message:
+      `${localStorage.getItem(
+        "userName"
+      )} reviewed ${parking.title}`,
+
+    createdAt:
+      new Date(),
+
+    read: false,
+
   }
 
-  className="bg-black text-white px-6 py-3 rounded-2xl font-bold disabled:bg-gray-400"
->
-                {parking.availability === "Occupied"
-                  ? "Already Occupied"
-                  : "Book Yearly"}
+);
+
+                    
+
+                    setReviewText("");
+
+                    setRating(5);
+
+                    alert(
+                      "Review Added"
+                    );
+
+                  } catch (error) {
+
+                    console.log(error);
+
+                  } finally {
+
+                    setSubmittingReview(
+                      false
+                    );
+
+                  }
+
+                }}
+
+                disabled={
+                  submittingReview
+                }
+
+                className="bg-green-500 text-white px-6 py-4 rounded-2xl font-bold"
+
+              >
+
+                {submittingReview
+                  ? "Submitting..."
+                  : "Submit Review"}
+
               </button>
+
+            </div>
+
+            {/* REVIEW LIST */}
+
+            <div className="grid gap-5">
+
+              {reviews.length ===
+              0 ? (
+
+                <div className="text-center py-10">
+
+                  <h2 className="text-2xl font-bold text-gray-500">
+
+                    No Reviews Yet
+
+                  </h2>
+
+                </div>
+
+              ) : (
+
+                reviews.map(
+                  (review) => (
+
+                    <div
+                      key={
+                        review.id
+                      }
+                      className="border p-6 rounded-3xl"
+                    >
+
+                      <div className="flex items-center justify-between mb-4">
+
+                        <div>
+
+                          <h3 className="text-xl font-bold">
+
+                            {
+                              review.userName
+                            }
+
+                          </h3>
+
+                          <p className="text-gray-500">
+
+                            {
+                              review.userEmail
+                            }
+
+                          </p>
+
+                        </div>
+
+                        <div className="bg-yellow-400 px-5 py-3 rounded-2xl font-bold">
+
+                          ⭐{" "}
+                          {
+                            review.rating
+                          }
+                          /5
+
+                        </div>
+
+                      </div>
+
+                      <p className="text-gray-700">
+
+                        {
+                          review.review
+                        }
+
+                      </p>
+
+                    </div>
+
+                  )
+                )
+
+              )}
 
             </div>
 

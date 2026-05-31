@@ -20,111 +20,153 @@ import { app, db } from "@/lib/firebase";
 
 export default function Home() {
 
-  const [parkingSpots, setParkingSpots] = useState<any[]>([]);
+  const [parkingSpots, setParkingSpots] =
+    useState<any[]>([]);
 
-  const [search, setSearch] = useState("");
-  const [userLatitude, setUserLatitude] = useState<any>(null);
+  const [search, setSearch] =
+    useState("");
 
-const [userLongitude, setUserLongitude] = useState<any>(null);
+    const [parkingTypeFilter,
+  setParkingTypeFilter] =
+  useState("All");
 
-  const [user, setUser] = useState<any>(null);
+const [availableOnly,
+  setAvailableOnly] =
+  useState(false);
 
-  const [loading, setLoading] = useState(true);
+  const [maxPrice,
+  setMaxPrice] =
+  useState("All");
+
+  const [userLatitude, setUserLatitude] =
+    useState<any>(null);
+
+  const [userLongitude, setUserLongitude] =
+    useState<any>(null);
+
+  const [user, setUser] =
+    useState<any>(null);
+
+  const [loading, setLoading] =
+    useState(true);
 
   const auth = getAuth(app);
+
+  // DISTANCE CALCULATION
+
   const calculateDistance = (
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-) => {
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
 
-  const R = 6371;
+    const R = 6371;
 
-  const dLat =
-    ((lat2 - lat1) * Math.PI) / 180;
+    const dLat =
+      ((lat2 - lat1) * Math.PI) /
+      180;
 
-  const dLon =
-    ((lon2 - lon1) * Math.PI) / 180;
+    const dLon =
+      ((lon2 - lon1) * Math.PI) /
+      180;
 
-  const a =
-    Math.sin(dLat / 2) *
-      Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    const a =
+      Math.sin(dLat / 2) *
+        Math.sin(dLat / 2) +
+      Math.cos(
+        (lat1 * Math.PI) / 180
+      ) *
+        Math.cos(
+          (lat2 * Math.PI) / 180
+        ) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
 
-  const c =
-    2 *
-    Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(1 - a)
-    );
+    const c =
+      2 *
+      Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+      );
 
-  return R * c;
-};
+    return R * c;
 
-  // AUTH STATE
+  };
+
+  // AUTH
+
   useEffect(() => {
 
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (currentUser) => {
+    const unsubscribe =
+      onAuthStateChanged(
 
-        setUser(currentUser);
+        auth,
 
-      }
-    );
+        (currentUser) => {
+
+          setUser(currentUser);
+
+        }
+
+      );
 
     return () => unsubscribe();
 
   }, []);
 
   // FETCH PARKINGS
+
   useEffect(() => {
 
-  setLoading(true);
+    setLoading(true);
 
-  const unsubscribe = onSnapshot(
+    const unsubscribe =
+      onSnapshot(
 
-    collection(db, "parkings"),
+        collection(
+          db,
+          "parkings"
+        ),
 
-    (snapshot) => {
+        (snapshot) => {
 
-      const parkingData: any[] = [];
+          const parkingData: any[] =
+            [];
 
-      snapshot.forEach((doc) => {
+          snapshot.forEach((doc) => {
 
-        parkingData.push({
+            parkingData.push({
 
-          id: doc.id,
+              id: doc.id,
 
-          ...doc.data(),
+              ...doc.data(),
 
-        });
+            });
 
-      });
+          });
 
-      setParkingSpots(parkingData);
+          setParkingSpots(
+            parkingData
+          );
 
-      setLoading(false);
+          setLoading(false);
 
-    },
+        },
 
-    (error) => {
+        (error) => {
 
-      console.log(error);
+          console.log(error);
 
-      setLoading(false);
+          setLoading(false);
 
-    }
+        }
 
-  );
+      );
 
-  return () => unsubscribe();
+    return () => unsubscribe();
 
-}, []);
+  }, []);
 
   return (
 
@@ -132,19 +174,33 @@ const [userLongitude, setUserLongitude] = useState<any>(null);
 
       {/* HEADER */}
 
-      <header className="bg-black text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+      <header className="bg-black text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-xl">
 
-        <h1 className="text-3xl font-bold">
-          CarParking Bangalore
-        </h1>
+        <h1 className="text-4xl font-bold">
+
+  <span className="text-white">
+    CarParking
+  </span>
+
+  <span className="text-green-400">
+    Bangalore
+  </span>
+
+</h1>
 
         <nav className="hidden md:flex gap-8 font-medium">
 
-          <a href="#home">Home</a>
+          <a href="#home">
+            Home
+          </a>
 
-          <a href="#parking">Search Parking</a>
+          <a href="#parking">
+            Search Parking
+          </a>
 
-          <a href="#owners">List Parking</a>
+          <a href="#owners">
+            List Parking
+          </a>
 
           <Link href="/contact">
             Contact
@@ -156,103 +212,127 @@ const [userLongitude, setUserLongitude] = useState<any>(null);
 
           {user ? (
 
-            <>
-              <div className="relative group">
+            <div className="relative group">
 
-  <img
-    src={
-      user.photoURL ||
-      "https://via.placeholder.com/50"
-    }
-    className="w-12 h-12 rounded-full object-cover border-2 border-green-500 cursor-pointer"
-  />
+              <img
+                src={
+                  user.photoURL ||
+                  "https://via.placeholder.com/50"
+                }
+                className="w-12 h-12 rounded-full object-cover border-2 border-green-500 cursor-pointer"
+              />
 
-  <div className="absolute right-0 mt-3 w-64 bg-white text-black rounded-2xl shadow-2xl p-5 hidden group-hover:block z-50">
+              <div className="absolute right-0 mt-3 w-72 bg-white text-black rounded-3xl shadow-2xl p-6 hidden group-hover:block z-50">
 
-    <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-4 mb-5">
 
-      <img
-        src={
-          user.photoURL ||
-          "https://via.placeholder.com/50"
-        }
-        className="w-14 h-14 rounded-full object-cover"
-      />
+                  <img
+                    src={
+                      user.photoURL ||
+                      "https://via.placeholder.com/50"
+                    }
+                    className="w-16 h-16 rounded-full object-cover"
+                  />
 
-      <div>
+                  <div>
 
-        <h3 className="font-bold">
-          {user.displayName || "User"}
-        </h3>
+                    <h3 className="font-bold text-xl">
 
-        <p className="text-sm text-gray-500">
-          {user.email}
-        </p>
+                      {user.displayName ||
+                        "User"}
 
-      </div>
+                    </h3>
 
-    </div>
+                    <p className="text-sm text-gray-500">
 
-    <Link
-      href="/profile"
-      className="block bg-green-500 text-white text-center py-3 rounded-2xl font-bold mb-3"
-    >
-      My Profile
-    </Link>
+                      {user.email}
 
-    <button
-      onClick={async () => {
+                    </p>
 
-        await signOut(auth);
+                  </div>
 
-        localStorage.clear();
+                </div>
 
-        window.location.href = "/";
+                <div className="flex flex-col gap-3">
 
-      }}
-      className="w-full bg-red-500 text-white py-3 rounded-2xl font-bold"
-    >
-      Logout
-    </button>
+                  <Link
+                    href="/profile"
+                    className="bg-green-500 text-white text-center py-3 rounded-2xl font-bold"
+                  >
 
-  </div>
+                    My Profile
 
-</div>
+                  </Link>
 
-              <button
-                onClick={async () => {
+                  <Link
+                    href="/bookings"
+                    className="bg-black text-white text-center py-3 rounded-2xl font-bold"
+                  >
 
-                  await signOut(auth);
+                    My Bookings
 
-                  localStorage.removeItem("userEmail");
+                  </Link>
 
-                  localStorage.removeItem("userName");
+                  <Link
+                    href="/dashboard"
+                    className="bg-blue-500 text-white text-center py-3 rounded-2xl font-bold"
+                  >
 
-                  window.location.href = "/";
+                    Dashboard
 
-                }}
-                className="bg-red-500 px-5 py-2 rounded-xl font-semibold"
-              >
-                Logout
-              </button>
-            </>
+                  </Link>
+
+                  <button
+
+                    onClick={async () => {
+
+                      await signOut(
+                        auth
+                      );
+
+                      localStorage.clear();
+
+                      window.location.href =
+                        "/";
+
+                    }}
+
+                    className="w-full bg-red-500 text-white py-3 rounded-2xl font-bold"
+
+                  >
+
+                    Logout
+
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
 
           ) : (
 
             <>
+
               <Link
                 href="/login"
                 className="bg-white text-black px-5 py-2 rounded-xl font-semibold"
               >
+
                 Login
+
               </Link>
 
               <Link
                 href="/signup"
                 className="bg-green-500 px-5 py-2 rounded-xl font-semibold"
               >
+
                 Register
+
               </Link>
+
             </>
 
           )}
@@ -261,104 +341,277 @@ const [userLongitude, setUserLongitude] = useState<any>(null);
 
       </header>
 
-      {/* HERO SECTION */}
+      {/* HERO */}
 
-      <section
-        id="home"
-        className="relative h-[70vh] bg-cover bg-center flex items-center justify-center"
-        style={{
-          backgroundImage:
-            "url('https://images.unsplash.com/photo-1502877338535-766e1452684a?q=80&w=1600&auto=format&fit=crop')",
-        }}
-      >
-
-        <div className="absolute inset-0 bg-black/60"></div>
-
-        <div className="relative z-10 text-center text-white w-full px-6">
-
-          <h2 className="text-5xl font-bold mb-6">
-            Book Smart Parking in Bangalore
-          </h2>
-
-          <p className="text-xl mb-10">
-            Book monthly or yearly parking spaces instantly.
-          </p>
-
-          <div className="bg-white rounded-3xl p-5 flex flex-col md:flex-row gap-4 max-w-5xl mx-auto">
-
-            <input
-              type="text"
-              placeholder="Search by location"
-              value={search}
-              onChange={(e) =>
-                setSearch(e.target.value)
-              }
-              className="flex-1 border p-4 rounded-2xl text-black"
-            />
-
-            <button className="bg-green-500 text-white px-10 py-4 rounded-2xl font-bold">
-              Search Parking
-            </button>
-            <button
-  onClick={() => {
-
-    if (!navigator.geolocation) {
-
-      alert("Geolocation is not supported");
-
-      return;
-
-    }
-
-    navigator.geolocation.getCurrentPosition(
-
-      (position) => {
-
-        console.log(position);
-
-        setUserLatitude(
-          position.coords.latitude
-        );
-
-        setUserLongitude(
-          position.coords.longitude
-        );
-
-        alert("Location Captured Successfully");
-
-      },
-
-      (error) => {
-
-        console.log(error);
-
-        alert(
-          "Please allow location permission"
-        );
-
-      },
-
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-
-    );
-
+<section
+  id="home"
+  className="relative min-h-[85vh] bg-cover bg-center"
+  style={{
+   backgroundImage:
+  "url('https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=1920&auto=format&fit=crop')"
   }}
-  className="bg-black text-white px-6 py-4 rounded-2xl font-bold"
 >
-  Use Current Location
-</button>
 
-          </div>
+  <div className="absolute inset-0 bg-black/35"></div>
+
+  <div className="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-16">
+
+    <div className="grid lg:grid-cols-2 gap-12 items-center">
+
+      {/* LEFT CONTENT */}
+
+      <div>
+
+        <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+
+  Find Smart Parking
+  In <span className="text-green-400">Bangalore</span>
+
+</h1>
+
+        <p className="text-xl text-gray-300 mb-8">
+
+          Book monthly or yearly parking spaces instantly and hassle-free.
+
+        </p>
+
+      </div>
+
+      {/* RIGHT FEATURES */}
+
+      <div className="grid grid-cols-2 gap-4">
+
+        <div className="bg-white/10 backdrop-blur-lg border border-gray-700 rounded-2xl p-4">
+
+          <h3 className="text-green-400 font-bold text-1g mb-2">
+            Secure Parking
+          </h3>
+
+          <p className="text-gray-300">
+            Safe & monitored spaces
+          </p>
 
         </div>
 
-      </section>
+        <div className="bg-white/10 backdrop-blur-lg border border-gray-700 rounded-2xl p-4">
 
-      {/* PARKING LIST */}
+          <h3 className="text-green-400 font-bold text-lg mb-2">
+            Best Prices
+          </h3>
+
+          <p className="text-gray-300">
+            Affordable & transparent
+          </p>
+
+        </div>
+
+        <div className="bg-white/10 backdrop-blur-lg border border-gray-700 rounded-2xl p-4">
+
+          <h3 className="text-green-400 font-bold text-lg mb-2">
+            Easy Booking
+          </h3>
+
+          <p className="text-gray-300">
+            Monthly & yearly plans
+          </p>
+
+        </div>
+
+        <div className="bg-white/10 backdrop-blur-lg border border-gray-700 rounded-2xl p-4">
+
+          <h3 className="text-green-400 font-bold text-lg mb-2">
+            Prime Locations
+          </h3>
+
+          <p className="text-gray-300">
+            Across Bangalore
+          </p>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    {/* SEARCH BAR */}
+
+    <div className="bg-white rounded-3xl shadow-2xl p-4 mt-12">
+
+      <div className="grid lg:grid-cols-5 gap-4">
+
+        <input
+          type="text"
+          placeholder="Search location or parking name"
+          value={search}
+          onChange={(e) =>
+            setSearch(e.target.value)
+          }
+          className="border py-3 px-4 rounded-2xl"
+        />
+
+        <select
+          value={parkingTypeFilter}
+          onChange={(e) =>
+            setParkingTypeFilter(
+              e.target.value
+            )
+          }
+          className="border py-3 px-4 rounded-2xl"
+        >
+
+          <option value="All">
+            All Types
+          </option>
+
+          <option value="Covered Parking">
+            Covered Parking
+          </option>
+
+          <option value="Open Parking">
+            Open Parking
+          </option>
+
+        </select>
+
+        <select
+          value={maxPrice}
+          onChange={(e) =>
+            setMaxPrice(
+              e.target.value
+            )
+          }
+          className="border py-3 px-4 rounded-2xl"
+        >
+
+          <option value="All">
+            Any Price
+          </option>
+
+          <option value="1000">
+            Under ₹1000
+          </option>
+
+          <option value="2000">
+            Under ₹2000
+          </option>
+
+          <option value="3000">
+            Under ₹3000
+          </option>
+
+          <option value="5000">
+            Under ₹5000
+          </option>
+
+        </select>
+
+        <label className="flex items-center justify-center gap-3 border rounded-2xl px-4">
+
+          <input
+            type="checkbox"
+            checked={availableOnly}
+            onChange={(e) =>
+              setAvailableOnly(
+                e.target.checked
+              )
+            }
+          />
+
+          Available Only
+
+        </label>
+
+        <button
+
+          onClick={() => {
+
+            navigator.geolocation.getCurrentPosition(
+
+              (position) => {
+
+                setUserLatitude(
+                  position.coords.latitude
+                );
+
+                setUserLongitude(
+                  position.coords.longitude
+                );
+
+              }
+
+            );
+
+          }}
+
+          className="bg-black text-white rounded-2xl font-bold"
+
+        >
+
+          Use My Location
+
+        </button>
+
+      </div>
+
+    </div>
+
+    {/* TRUST BAR */}
+
+    <div className="grid md:grid-cols-4 gap-6 mt-10">
+
+      <div className="bg-white rounded-2xl p-6 text-center">
+
+        <h3 className="font-bold text-lg">
+          📍 Wide Coverage
+        </h3>
+
+        <p className="text-gray-500">
+          Across Bangalore
+        </p>
+
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 text-center">
+
+        <h3 className="font-bold text-lg">
+          ✅ Verified Owners
+        </h3>
+
+        <p className="text-gray-500">
+          Trusted Listings
+        </p>
+
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 text-center">
+
+        <h3 className="font-bold text-lg">
+          🎧 24/7 Support
+        </h3>
+
+        <p className="text-gray-500">
+          We're Here To Help
+        </p>
+
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 text-center">
+
+        <h3 className="font-bold text-lg">
+          💰 No Hidden Charges
+        </h3>
+
+        <p className="text-gray-500">
+          Transparent Pricing
+        </p>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
 
       <section
         id="parking"
@@ -367,177 +620,428 @@ const [userLongitude, setUserLongitude] = useState<any>(null);
 
         <div className="max-w-7xl mx-auto">
 
-          <h2 className="text-5xl font-bold mb-12">
-            Available Parking Slots
-          </h2>
+          <div className="flex items-center justify-between mb-12">
+
+           <div>
+
+  <h2 className="text-4xl font-bold">
+
+    Available Parking Slots
+
+  </h2>
+
+  <p className="text-gray-500 mt-2">
+
+    Find verified parking spaces across Bangalore
+
+  </p>
+
+</div>
+
+            <div className="bg-black text-white px-6 py-3 rounded-2xl font-bold">
+
+              {
+                parkingSpots.filter(
+                  (spot) =>
+                    spot.status ===
+                    "Approved"
+                ).length
+              } Listings
+
+            </div>
+
+          </div>
 
           {loading ? (
 
-            <div className="text-center text-3xl font-bold py-20">
+            <div className="text-center text-xl font-bold py-20">
+
               Loading Parking Slots...
-            </div>
 
-          ) : parkingSpots.length === 0 ? (
-
-            <div className="text-center text-3xl font-bold text-red-500 py-20">
-              No Parking Slots Found
             </div>
 
           ) : (
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
 
               {parkingSpots
-  .filter((spot) =>
-    spot.location
-      ?.toLowerCase()
-      .includes(search.toLowerCase())
-  )
 
-  .sort((a, b) => {
+                // ONLY APPROVED
 
-    if (
-      !userLatitude ||
-      !userLongitude
-    ) {
+                .filter(
 
-      return 0;
+                  (spot) =>
+                    spot.status ===
+                    "Approved"
 
-    }
+                )
 
-    const distanceA =
-      calculateDistance(
-        Number(userLatitude),
-        Number(userLongitude),
-        Number(a.latitude),
-        Number(a.longitude)
-      );
+                // SEARCH
 
-    const distanceB =
-      calculateDistance(
-        Number(userLatitude),
-        Number(userLongitude),
-        Number(b.latitude),
-        Number(b.longitude)
-      );
+                .filter((spot) =>
 
-    return distanceA - distanceB;
+  spot.location
+    ?.toLowerCase()
+    .includes(
+      search.toLowerCase()
+    )
 
-  })
+  ||
 
-  .map((spot) => (
+  spot.title
+    ?.toLowerCase()
+    .includes(
+      search.toLowerCase()
+    )
+
+)
+
+.filter((spot) =>
+
+  parkingTypeFilter ===
+    "All"
+
+    ? true
+
+    : spot.parkingType ===
+      parkingTypeFilter
+
+)
+
+.filter((spot) =>
+
+  availableOnly
+
+    ? spot.availability ===
+      "Available"
+
+    : true
+
+)
+
+.filter((spot) =>
+
+  maxPrice === "All"
+
+    ? true
+
+    : Number(
+        spot.monthlyPrice
+      ) <=
+      Number(maxPrice)
+
+)
+
+                // FEATURED FIRST
+
+                .sort((a, b) => {
+
+                  if (
+                    a.featured &&
+                    !b.featured
+                  ) {
+
+                    return -1;
+
+                  }
+
+                  if (
+                    !a.featured &&
+                    b.featured
+                  ) {
+
+                    return 1;
+
+                  }
+
+                  return 0;
+
+                })
+
+                // DISTANCE SORT
+
+                .sort((a, b) => {
+
+                  if (
+                    !userLatitude ||
+                    !userLongitude
+                  ) {
+
+                    return 0;
+
+                  }
+
+                  const distanceA =
+                    calculateDistance(
+
+                      Number(
+                        userLatitude
+                      ),
+
+                      Number(
+                        userLongitude
+                      ),
+
+                      Number(
+                        a.latitude
+                      ),
+
+                      Number(
+                        a.longitude
+                      )
+
+                    );
+
+                  const distanceB =
+                    calculateDistance(
+
+                      Number(
+                        userLatitude
+                      ),
+
+                      Number(
+                        userLongitude
+                      ),
+
+                      Number(
+                        b.latitude
+                      ),
+
+                      Number(
+                        b.longitude
+                      )
+
+                    );
+
+                  return (
+                    distanceA -
+                    distanceB
+                  );
+
+                })
+
+                .map((spot) => (
 
                   <div
-                    key={spot.id}
-                    className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition"
-                  >
+  key={spot.id}
+  className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
+>
 
-                    <Image
-                      src={
-                        spot.image ||
-                        "https://via.placeholder.com/400"
-                      }
-                      alt={spot.title}
-                      width={500}
-                      height={300}
-                      className="h-60 w-full object-cover"
-                    />
+                    <div className="relative">
 
-                    <div className="p-6">
+  <Image
+    src={
+      spot.image ||
+      "https://via.placeholder.com/400"
+    }
+    alt={spot.title}
+    width={500}
+    height={300}
+    className="h-52 w-full object-cover transition duration-500 hover:scale-105"
+  />
 
-                      <h3 className="text-2xl font-bold mb-2">
-                        {spot.title}
-                      </h3>
+  <div className="absolute top-3 right-3">
 
-                      <div className="mb-4">
+  <button className="bg-white w-10 h-10 rounded-full shadow-lg hover:scale-110 transition">
 
-  <p className="text-gray-600">
-    {spot.location}
-  </p>
+    ❤️
 
-  {userLatitude &&
-    userLongitude &&
-    spot.latitude &&
-    spot.longitude && (
-
-      <p className="text-green-600 font-bold mt-2">
-
-        {calculateDistance(
-          Number(userLatitude),
-          Number(userLongitude),
-          Number(spot.latitude),
-          Number(spot.longitude)
-        ).toFixed(1)} km away
-
-      </p>
-
-    )}
+  </button>
 
 </div>
 
-                      <span
-                        className={`inline-block px-4 py-2 rounded-xl text-white font-semibold mb-4 ${
-                          spot.availability === "Available"
-                            ? "bg-green-500"
-                            : "bg-red-500"
-                        }`}
-                      >
-                        {spot.availability}
-                      </span>
+  {/* BADGES ON IMAGE */}
 
-                      <div className="flex justify-between mb-6">
+  <div className="absolute top-3 left-3 flex gap-2">
+
+  {spot.featured && (
+    <span className="bg-purple-600 text-white text-xs px-3 py-1 rounded-full font-semibold">
+      Featured
+    </span>
+  )}
+
+  {spot.verified && (
+    <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
+      Verified
+    </span>
+  )}
+
+  <span
+    className={`text-xs px-3 py-1 rounded-full text-white font-semibold ${
+      spot.availability === "Available"
+        ? "bg-green-500"
+        : "bg-red-500"
+    }`}
+  >
+    {spot.availability}
+  </span>
+
+</div>
+
+</div>
+
+                    <div className="p-5">
+
+                      
+
+                      <h3 className="text-lg font-bold mb-2 line-clamp-2">
+
+                        {spot.title}
+
+                      </h3>
+
+                      <p className="text-gray-600 mb-4">
+
+                        {spot.location}
+
+                      </p>
+
+                      {/* DISTANCE */}
+
+                      {userLatitude &&
+                        userLongitude &&
+                        spot.latitude &&
+                        spot.longitude && (
+
+                          <p className="text-green-600 font-bold mb-4">
+
+                            {calculateDistance(
+
+                              Number(
+                                userLatitude
+                              ),
+
+                              Number(
+                                userLongitude
+                              ),
+
+                              Number(
+                                spot.latitude
+                              ),
+
+                              Number(
+                                spot.longitude
+                              )
+
+                            ).toFixed(1)}
+                            km away
+
+                          </p>
+
+                        )}
+
+                      {/* STATUS */}
+
+                      
+
+                      {/* OWNER */}
+
+                      <div className="flex items-center gap-3 mb-4">
+
+                        <img
+                          src={
+  spot.ownerPhoto &&
+  spot.ownerPhoto.trim() !== ""
+    ? spot.ownerPhoto
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        spot.ownerName || "Owner"
+      )}&background=16a34a&color=fff`
+}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
 
                         <div>
 
-                          <p className="text-sm text-gray-500">
-                            Monthly
-                          </p>
+                          <h4 className="font-semibold text-sm">
 
-                          <p className="font-bold">
-                            ₹{spot.monthlyPrice}/month
-                          </p>
+                            {
+                              spot.ownerName
+                            }
 
-                        </div>
+                          </h4>
 
-                        <div>
+                          <p className="text-xs text-gray-500">
 
-                          <p className="text-sm text-gray-500">
-                            Yearly
-                          </p>
+                            {
+                              spot.ownerCity
+                            }
 
-                          <p className="font-bold">
-                            ₹30000/year
                           </p>
 
                         </div>
 
                       </div>
 
-                      <div className="flex gap-3">
+                      {/* PRICE */}
 
-  <Link
-    href={`/parking/${spot.id}`}
-    className="flex-1 text-center bg-green-500 text-white py-3 rounded-2xl font-bold"
-  >
-    Book Now
-  </Link>
+<div className="bg-gray-50 rounded-2xl p-3 mb-4">
 
-  <a
-  href={
-    spot.latitude && spot.longitude
-      ? `https://www.google.com/maps?q=${spot.latitude},${spot.longitude}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          spot.location
-        )}`
-  }
-  target="_blank"
-  rel="noopener noreferrer"
-  className="flex-1 text-center bg-black text-white py-3 rounded-2xl font-bold"
->
-  View Map
-</a>
+  <div className="flex justify-between">
+
+    <div>
+
+      <p className="text-xs text-gray-500">
+        Monthly
+      </p>
+
+      <p className="font-bold text-green-600">
+
+        ₹{spot.monthlyPrice}/mo
+
+      </p>
+
+    </div>
+
+    <div>
+
+      <p className="text-xs text-gray-500">
+        Yearly
+      </p>
+
+      <p className="font-bold">
+
+        ₹30000/yr
+
+      </p>
+
+    </div>
+
+  </div>
 
 </div>
+
+                      {/* BUTTONS */}
+
+                      <div className="flex gap-3">
+
+                        <Link
+                          href={`/parking/${spot.id}`}
+                          className="flex-1 text-center bg-green-500 text-white py-3 rounded-2xl font-bold"
+                        >
+
+                          Book Now
+
+                        </Link>
+
+                        <a
+                          href={
+                            spot.latitude &&
+                            spot.longitude
+                              ? `https://www.google.com/maps?q=${spot.latitude},${spot.longitude}`
+                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                  spot.location
+                                )}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 text-center bg-black text-white py-3 rounded-2xl font-bold"
+                        >
+
+                          View Map
+
+                        </a>
+
+                      </div>
 
                     </div>
 
@@ -563,18 +1067,24 @@ const [userLongitude, setUserLongitude] = useState<any>(null);
         <div className="max-w-4xl mx-auto">
 
           <h2 className="text-5xl font-bold mb-6">
+
             Earn From Your Parking Space
+
           </h2>
 
           <p className="text-xl text-gray-300 mb-10">
+
             List your empty parking slots and start earning.
+
           </p>
 
           <Link
             href="/add-parking"
             className="inline-block bg-green-500 px-10 py-5 rounded-2xl text-xl font-bold"
           >
+
             List Your Parking
+
           </Link>
 
         </div>
@@ -590,11 +1100,15 @@ const [userLongitude, setUserLongitude] = useState<any>(null);
           <div>
 
             <h3 className="text-2xl font-bold mb-4">
+
               CarParking Bangalore
+
             </h3>
 
             <p className="text-gray-400">
+
               Smart parking marketplace for customers and owners.
+
             </p>
 
           </div>
@@ -602,13 +1116,17 @@ const [userLongitude, setUserLongitude] = useState<any>(null);
           <div>
 
             <h4 className="font-bold mb-4">
+
               Quick Links
+
             </h4>
 
             <ul className="space-y-2 text-gray-400">
 
               <li>
-                <Link href="/">Home</Link>
+                <Link href="/">
+                  Home
+                </Link>
               </li>
 
               <li>
@@ -630,12 +1148,16 @@ const [userLongitude, setUserLongitude] = useState<any>(null);
           <div>
 
             <h4 className="font-bold mb-4">
+
               Contact
+
             </h4>
 
             <ul className="space-y-2 text-gray-400">
 
-              <li>Bangalore, India</li>
+              <li>
+                Bangalore, India
+              </li>
 
               <li>
                 akhilnaidu19@gmail.com

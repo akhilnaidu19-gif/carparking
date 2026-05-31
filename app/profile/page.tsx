@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 
+import Link from "next/link";
+
 import {
   getAuth,
   onAuthStateChanged,
   updateProfile,
+  signOut,
 } from "firebase/auth";
 
 import {
@@ -24,192 +27,676 @@ import { app, db, storage } from "@/lib/firebase";
 
 export default function ProfilePage() {
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] =
+    useState<any>(null);
 
-  const [name, setName] = useState("");
+  const [name, setName] =
+    useState("");
 
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] =
+    useState("");
 
-  const [city, setCity] = useState("");
+  const [city, setCity] =
+    useState("");
 
-  const [photo, setPhoto] = useState<any>(null);
+  const [photo, setPhoto] =
+    useState<any>(null);
 
-  const [photoURL, setPhotoURL] = useState("");
+  const [photoURL, setPhotoURL] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [profileCompletion, setProfileCompletion] =
+    useState(0);
 
   const auth = getAuth(app);
 
+  // AUTH + FETCH PROFILE
+
   useEffect(() => {
 
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      async (currentUser) => {
+    const unsubscribe =
+      onAuthStateChanged(
 
-        if (currentUser) {
+        auth,
 
-          setUser(currentUser);
+        async (currentUser) => {
 
-          const docRef = doc(
-            db,
-            "users",
-            currentUser.uid
-          );
+          if (currentUser) {
 
-          const docSnap = await getDoc(docRef);
+            setUser(currentUser);
 
-          if (docSnap.exists()) {
+            const docRef = doc(
+              db,
+              "users",
+              currentUser.uid
+            );
 
-            const data = docSnap.data();
+            const docSnap =
+              await getDoc(docRef);
 
-            setName(data.name || "");
+            if (
+              docSnap.exists()
+            ) {
 
-            setPhone(data.phone || "");
+              const data =
+                docSnap.data();
 
-            setCity(data.city || "");
+              setName(
+                data.name || ""
+              );
 
-            setPhotoURL(data.photoURL || "");
+              setPhone(
+                data.phone || ""
+              );
+
+              setCity(
+                data.city || ""
+              );
+
+              setPhotoURL(
+                data.photoURL ||
+                  ""
+              );
+
+            }
 
           }
 
         }
 
-      }
-    );
+      );
 
-    return () => unsubscribe();
+    return () =>
+      unsubscribe();
 
   }, []);
 
-  const handleSave = async () => {
+  // PROFILE COMPLETION
 
-    if (!user) return;
+  useEffect(() => {
 
-    let uploadedPhoto = photoURL;
+    let completed = 0;
 
-    try {
+    if (name) completed += 25;
 
-      if (photo) {
+    if (phone)
+      completed += 25;
 
-        const imageRef = ref(
-          storage,
-          `profile-images/${user.uid}`
+    if (city) completed += 25;
+
+    if (photoURL)
+      completed += 25;
+
+    setProfileCompletion(
+      completed
+    );
+
+  }, [
+    name,
+    phone,
+    city,
+    photoURL,
+  ]);
+
+  // SAVE PROFILE
+
+  const handleSave =
+    async () => {
+
+      if (!user) return;
+
+      let uploadedPhoto =
+        photoURL;
+
+      try {
+
+        setLoading(true);
+
+        // IMAGE UPLOAD
+
+        if (photo) {
+
+          const imageRef =
+            ref(
+
+              storage,
+
+              `profile-images/${user.uid}`
+
+            );
+
+          await uploadBytes(
+            imageRef,
+            photo
+          );
+
+          uploadedPhoto =
+            await getDownloadURL(
+              imageRef
+            );
+
+          setPhotoURL(
+            uploadedPhoto
+          );
+
+        }
+
+        // FIRESTORE SAVE
+
+        await setDoc(
+          doc(
+            db,
+            "users",
+            user.uid
+          ),
+
+          {
+
+            name,
+
+            phone,
+
+            city,
+
+            photoURL:
+              uploadedPhoto,
+
+            email:
+              user.email,
+
+            verified: false,
+
+            updatedAt:
+              new Date(),
+
+          }
+
         );
 
-        await uploadBytes(imageRef, photo);
+        localStorage.setItem(
+  "userPhone",
+  phone
+);
 
-        uploadedPhoto =
-          await getDownloadURL(imageRef);
+        // FIREBASE AUTH PROFILE
 
-        setPhotoURL(uploadedPhoto);
+        await updateProfile(
+          user,
+
+          {
+
+            displayName:
+              name,
+
+            photoURL:
+              uploadedPhoto,
+
+          }
+
+        );
+
+        alert(
+          "Profile Updated Successfully"
+        );
+
+      } catch (error) {
+
+        console.log(error);
+
+        alert(
+          "Error Updating Profile"
+        );
+
+      } finally {
+
+        setLoading(false);
 
       }
 
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          name,
-          phone,
-          city,
-          photoURL: uploadedPhoto,
-          email: user.email,
-        }
-      );
+    };
 
-      await updateProfile(user, {
-        displayName: name,
-        photoURL: uploadedPhoto,
-      });
+  // LOGIN CHECK
 
-      alert("Profile Updated");
+  if (!user) {
 
-    } catch (error) {
+    return (
 
-      console.log(error);
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
 
-      alert("Error Updating Profile");
+        <h1 className="text-4xl font-bold">
 
-    }
+          Please Login
 
-  };
+        </h1>
+
+      </div>
+
+    );
+
+  }
 
   return (
 
     <div className="min-h-screen bg-gray-100 py-16 px-6">
 
-      <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl p-10">
+      <div className="max-w-6xl mx-auto">
 
-        <h1 className="text-5xl font-bold mb-10 text-center">
-          My Profile
-        </h1>
+        {/* TOP PROFILE CARD */}
 
-        <div className="flex justify-center mb-8">
+        <div className="bg-black text-white rounded-3xl shadow-2xl p-10 mb-10">
 
-          <img
-            src={
-              photoURL ||
-              "https://via.placeholder.com/150"
-            }
-            className="w-40 h-40 rounded-full object-cover border-4 border-green-500"
-          />
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+
+            <div className="flex items-center gap-6">
+
+              <img
+                src={
+                  photoURL ||
+                  "https://via.placeholder.com/150"
+                }
+                className="w-36 h-36 rounded-full object-cover border-4 border-green-500"
+              />
+
+              <div>
+
+                <h1 className="text-5xl font-bold mb-3">
+
+                  {name ||
+                    "Your Profile"}
+
+                </h1>
+
+                <p className="text-gray-300 text-lg">
+
+                  {user.email}
+
+                </p>
+
+                <div className="flex flex-wrap gap-3 mt-4">
+
+                  <span className="bg-green-500 px-4 py-2 rounded-xl font-bold">
+
+                    Verified User
+
+                  </span>
+
+                  <span className="bg-blue-500 px-4 py-2 rounded-xl font-bold">
+
+                    {profileCompletion}
+                    % Complete
+
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* ACTIONS */}
+
+            <div className="flex flex-col gap-4">
+
+              <Link
+                href="/dashboard"
+                className="bg-green-500 text-white px-6 py-4 rounded-2xl font-bold text-center"
+              >
+
+                Owner Dashboard
+
+              </Link>
+
+              <Link
+                href="/bookings"
+                className="bg-white text-black px-6 py-4 rounded-2xl font-bold text-center"
+              >
+
+                My Bookings
+
+              </Link>
+
+              <button
+
+                onClick={async () => {
+
+                  await signOut(
+                    auth
+                  );
+
+                  localStorage.clear();
+
+                  window.location.href =
+                    "/";
+
+                }}
+
+                className="bg-red-500 text-white px-6 py-4 rounded-2xl font-bold"
+
+              >
+
+                Logout
+
+              </button>
+
+            </div>
+
+          </div>
 
         </div>
 
-        <input
-          type="file"
-          onChange={(e) => {
+        {/* MAIN GRID */}
 
-            if (e.target.files?.[0]) {
+        <div className="grid md:grid-cols-3 gap-8">
 
-              setPhoto(e.target.files[0]);
+          {/* PROFILE FORM */}
 
-            }
+          <div className="md:col-span-2 bg-white rounded-3xl shadow-xl p-10">
 
-          }}
-          className="w-full border p-4 rounded-2xl mb-6"
-        />
+            <h2 className="text-4xl font-bold mb-8">
 
-        <input
-          type="text"
-          placeholder="Full Name"
-          value={name}
-          onChange={(e) =>
-            setName(e.target.value)
-          }
-          className="w-full border p-4 rounded-2xl mb-6"
-        />
+              Edit Profile
 
-        <input
-          type="text"
-          placeholder="Phone Number"
-          value={phone}
-          onChange={(e) =>
-            setPhone(e.target.value)
-          }
-          className="w-full border p-4 rounded-2xl mb-6"
-        />
+            </h2>
 
-        <input
-          type="text"
-          placeholder="City"
-          value={city}
-          onChange={(e) =>
-            setCity(e.target.value)
-          }
-          className="w-full border p-4 rounded-2xl mb-6"
-        />
+            {/* PHOTO */}
 
-        <input
-          type="email"
-          value={user?.email || ""}
-          disabled
-          className="w-full border p-4 rounded-2xl mb-6 bg-gray-100"
-        />
+            <div className="mb-8">
 
-        <button
-          onClick={handleSave}
-          className="w-full bg-green-500 text-white py-4 rounded-2xl font-bold text-xl"
-        >
-          Save Profile
-        </button>
+              <label className="block text-xl font-bold mb-4">
+
+                Profile Photo
+
+              </label>
+
+              <input
+                type="file"
+                onChange={(e) => {
+
+                  if (
+                    e.target
+                      .files?.[0]
+                  ) {
+
+                    setPhoto(
+                      e.target
+                        .files[0]
+                    );
+
+                  }
+
+                }}
+                className="w-full border p-4 rounded-2xl"
+              />
+
+            </div>
+
+            {/* NAME */}
+
+            <div className="mb-6">
+
+              <label className="block font-bold mb-3">
+
+                Full Name
+
+              </label>
+
+              <input
+                type="text"
+                placeholder="Enter Name"
+                value={name}
+                onChange={(e) =>
+                  setName(
+                    e.target
+                      .value
+                  )
+                }
+                className="w-full border p-4 rounded-2xl"
+              />
+
+            </div>
+
+            {/* PHONE */}
+
+            <div className="mb-6">
+
+              <label className="block font-bold mb-3">
+
+                Phone Number
+
+              </label>
+
+              <input
+                type="text"
+                placeholder="Enter Phone"
+                value={phone}
+                onChange={(e) =>
+                  setPhone(
+                    e.target
+                      .value
+                  )
+                }
+                className="w-full border p-4 rounded-2xl"
+              />
+
+            </div>
+
+            {/* CITY */}
+
+            <div className="mb-6">
+
+              <label className="block font-bold mb-3">
+
+                City
+
+              </label>
+
+              <input
+                type="text"
+                placeholder="Enter City"
+                value={city}
+                onChange={(e) =>
+                  setCity(
+                    e.target
+                      .value
+                  )
+                }
+                className="w-full border p-4 rounded-2xl"
+              />
+
+            </div>
+
+            {/* EMAIL */}
+
+            <div className="mb-8">
+
+              <label className="block font-bold mb-3">
+
+                Email Address
+
+              </label>
+
+              <input
+                type="email"
+                value={
+                  user?.email ||
+                  ""
+                }
+                disabled
+                className="w-full border p-4 rounded-2xl bg-gray-100"
+              />
+
+            </div>
+
+            {/* SAVE */}
+
+            <button
+
+              onClick={
+                handleSave
+              }
+
+              disabled={
+                loading
+              }
+
+              className="w-full bg-green-500 text-white py-5 rounded-2xl font-bold text-2xl disabled:bg-gray-400"
+
+            >
+
+              {loading
+                ? "Saving..."
+                : "Save Profile"}
+
+            </button>
+
+          </div>
+
+          {/* SIDE PANEL */}
+
+          <div className="space-y-8">
+
+            {/* PROFILE STATUS */}
+
+            <div className="bg-white rounded-3xl shadow-xl p-8">
+
+              <h2 className="text-3xl font-bold mb-6">
+
+                Profile Status
+
+              </h2>
+
+              <div className="w-full bg-gray-200 rounded-full h-5 mb-4">
+
+                <div
+                  className="bg-green-500 h-5 rounded-full"
+                  style={{
+                    width: `${profileCompletion}%`,
+                  }}
+                ></div>
+
+              </div>
+
+              <p className="text-gray-600 text-lg">
+
+                Complete your profile to improve trust and visibility on the platform.
+
+              </p>
+
+            </div>
+
+            {/* QUICK ACTIONS */}
+
+            <div className="bg-white rounded-3xl shadow-xl p-8">
+
+              <h2 className="text-3xl font-bold mb-6">
+
+                Quick Actions
+
+              </h2>
+
+              <div className="flex flex-col gap-4">
+
+                <Link
+                  href="/add-parking"
+                  className="bg-black text-white px-6 py-4 rounded-2xl font-bold text-center"
+                >
+
+                  Add Parking
+
+                </Link>
+
+                <Link
+                  href="/dashboard"
+                  className="bg-green-500 text-white px-6 py-4 rounded-2xl font-bold text-center"
+                >
+
+                  Owner Dashboard
+
+                </Link>
+
+                <Link
+                  href="/bookings"
+                  className="bg-blue-500 text-white px-6 py-4 rounded-2xl font-bold text-center"
+                >
+
+                  View Bookings
+
+                </Link>
+
+              </div>
+
+            </div>
+
+            {/* ACCOUNT INFO */}
+
+            <div className="bg-white rounded-3xl shadow-xl p-8">
+
+              <h2 className="text-3xl font-bold mb-6">
+
+                Account Info
+
+              </h2>
+
+              <div className="space-y-4">
+
+                <div>
+
+                  <p className="text-gray-500">
+
+                    Account Type
+
+                  </p>
+
+                  <p className="font-bold text-lg">
+
+                    Parking Marketplace User
+
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <p className="text-gray-500">
+
+                    Account Status
+
+                  </p>
+
+                  <p className="font-bold text-green-600 text-lg">
+
+                    Active
+
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <p className="text-gray-500">
+
+                    Platform
+
+                  </p>
+
+                  <p className="font-bold text-lg">
+
+                    CarParking Bangalore
+
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
 
       </div>
 

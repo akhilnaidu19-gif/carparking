@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useEffect, useState } from "react";
 
 import { db, app, storage } from "@/lib/firebase";
@@ -15,6 +14,9 @@ import {
   addDoc,
   doc,
   getDoc,
+  onSnapshot,
+  query,
+  where,
 } from "firebase/firestore";
 
 import {
@@ -25,13 +27,17 @@ import {
 
 export default function AddParkingPage() {
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] =
+    useState("");
 
-  const [location, setLocation] = useState("");
+  const [location, setLocation] =
+    useState("");
 
-  const [monthlyPrice, setMonthlyPrice] = useState("");
+  const [monthlyPrice, setMonthlyPrice] =
+    useState("");
 
-  const [yearlyPrice, setYearlyPrice] = useState("");
+  const [yearlyPrice, setYearlyPrice] =
+    useState("");
 
   const [parkingType, setParkingType] =
     useState("Covered Parking");
@@ -42,49 +48,111 @@ export default function AddParkingPage() {
   const [description, setDescription] =
     useState("");
 
-  const [availability, setAvailability] =
-    useState("Available");
+  const [images, setImages] =
+    useState<any[]>([]);
 
-  const [image, setImage] = useState<any>(null);
+  const [parkings, setParkings] =
+    useState<any[]>([]);
 
-  const [parkings, setParkings] = useState<any[]>([]);
+  const [latitude, setLatitude] =
+    useState("");
 
-  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] =
+    useState("");
 
-  const [longitude, setLongitude] = useState("");
-
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] =
+    useState<any>(null);
 
   const [loading, setLoading] =
     useState(false);
 
   const auth = getAuth(app);
 
-  // AUTH CHECK
+  // AUTH
 
   useEffect(() => {
 
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (currentUser) => {
+    const unsubscribe =
+      onAuthStateChanged(
 
-        setUser(currentUser);
+        auth,
 
-      }
-    );
+        (currentUser) => {
+
+          setUser(currentUser);
+
+        }
+
+      );
 
     return () => unsubscribe();
 
   }, []);
 
+  // FETCH OWNER PARKINGS
+
+  useEffect(() => {
+
+    if (!user) return;
+
+    const q = query(
+
+      collection(db, "parkings"),
+
+      where(
+        "ownerUid",
+        "==",
+        user.uid
+      )
+
+    );
+
+    const unsubscribe =
+      onSnapshot(
+
+        q,
+
+        (snapshot) => {
+
+          const parkingData: any[] =
+            [];
+
+          snapshot.forEach((doc) => {
+
+            parkingData.push({
+
+              id: doc.id,
+
+              ...doc.data(),
+
+            });
+
+          });
+
+          setParkings(
+            parkingData
+          );
+
+        }
+
+      );
+
+    return () => unsubscribe();
+
+  }, [user]);
+
+  // LOGIN CHECK
+
   if (!user) {
 
     return (
 
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
 
-        <h1 className="text-3xl font-bold">
-          Please login to add parking
+        <h1 className="text-4xl font-bold">
+
+          Please Login To Add Parking
+
         </h1>
 
       </div>
@@ -97,11 +165,31 @@ export default function AddParkingPage() {
 
     <div className="min-h-screen bg-gray-100 py-16 px-6">
 
-      <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-10">
+      {/* HEADER */}
 
-        <h1 className="text-5xl font-bold mb-10 text-center">
-          List Your Parking Space
-        </h1>
+      <div className="max-w-6xl mx-auto mb-10">
+
+        <div className="bg-black text-white rounded-3xl p-10 shadow-2xl">
+
+          <h1 className="text-5xl font-bold mb-4">
+
+            List Your Parking Space
+
+          </h1>
+
+          <p className="text-gray-300 text-xl">
+
+            Submit your parking space and start earning monthly income.
+
+          </p>
+
+        </div>
+
+      </div>
+
+      {/* FORM */}
+
+      <div className="max-w-6xl mx-auto bg-white rounded-3xl shadow-2xl p-10">
 
         <div className="grid md:grid-cols-2 gap-6">
 
@@ -120,45 +208,51 @@ export default function AddParkingPage() {
           {/* LOCATION */}
 
           <input
-  type="text"
-  placeholder="Location"
-  value={location}
-  onChange={(e) =>
-    setLocation(e.target.value)
-  }
-  className="border p-4 rounded-2xl"
-/>
+            type="text"
+            placeholder="Parking Location"
+            value={location}
+            onChange={(e) =>
+              setLocation(e.target.value)
+            }
+            className="border p-4 rounded-2xl"
+          />
 
-          {/* MONTHLY PRICE */}
+          {/* MONTHLY */}
 
           <input
-            type="text"
+            type="number"
             placeholder="Monthly Price"
             value={monthlyPrice}
             onChange={(e) =>
-              setMonthlyPrice(e.target.value)
+              setMonthlyPrice(
+                e.target.value
+              )
             }
             className="border p-4 rounded-2xl"
           />
 
-          {/* YEARLY PRICE */}
+          {/* YEARLY */}
 
           <input
-            type="text"
+            type="number"
             placeholder="Yearly Price"
             value={yearlyPrice}
             onChange={(e) =>
-              setYearlyPrice(e.target.value)
+              setYearlyPrice(
+                e.target.value
+              )
             }
             className="border p-4 rounded-2xl"
           />
 
-          {/* PARKING TYPE */}
+          {/* TYPE */}
 
           <select
             value={parkingType}
             onChange={(e) =>
-              setParkingType(e.target.value)
+              setParkingType(
+                e.target.value
+              )
             }
             className="border p-4 rounded-2xl"
           >
@@ -182,7 +276,9 @@ export default function AddParkingPage() {
           <select
             value={cctv}
             onChange={(e) =>
-              setCctv(e.target.value)
+              setCctv(
+                e.target.value
+              )
             }
             className="border p-4 rounded-2xl"
           >
@@ -197,32 +293,14 @@ export default function AddParkingPage() {
 
           </select>
 
-          {/* AVAILABILITY */}
-
-          <select
-            value={availability}
-            onChange={(e) =>
-              setAvailability(e.target.value)
-            }
-            className="border p-4 rounded-2xl"
-          >
-
-            <option>
-              Available
-            </option>
-
-            <option>
-              Occupied
-            </option>
-
-          </select>
-
         </div>
 
-        {/* CURRENT LOCATION BUTTON */}
+        {/* CURRENT LOCATION */}
 
         <button
+
           type="button"
+
           onClick={() => {
 
             navigator.geolocation.getCurrentPosition(
@@ -248,7 +326,7 @@ export default function AddParkingPage() {
                 console.log(error);
 
                 alert(
-                  "Unable to get location"
+                  "Location Permission Denied"
                 );
 
               }
@@ -256,28 +334,45 @@ export default function AddParkingPage() {
             );
 
           }}
-          className="bg-black text-white px-6 py-4 rounded-2xl font-bold mt-6"
+
+          className="bg-black text-white px-8 py-4 rounded-2xl font-bold mt-8"
+
         >
+
           Use Current Location
+
         </button>
 
-        {/* IMAGE */}
+        {/* MULTI IMAGE */}
 
-        <input
-          type="file"
-          onChange={(e) => {
+        <div className="mt-8">
 
-            if (e.target.files?.[0]) {
+          <label className="block text-xl font-bold mb-4">
 
-              setImage(
-                e.target.files[0]
-              );
+            Upload Parking Images
 
-            }
+          </label>
 
-          }}
-          className="border p-4 rounded-2xl w-full mt-6"
-        />
+          <input
+            type="file"
+            multiple
+            onChange={(e) => {
+
+              if (e.target.files) {
+
+                setImages(
+                  Array.from(
+                    e.target.files
+                  )
+                );
+
+              }
+
+            }}
+            className="border p-4 rounded-2xl w-full"
+          />
+
+        </div>
 
         {/* DESCRIPTION */}
 
@@ -285,12 +380,14 @@ export default function AddParkingPage() {
           placeholder="Parking Description"
           value={description}
           onChange={(e) =>
-            setDescription(e.target.value)
+            setDescription(
+              e.target.value
+            )
           }
-          className="border p-4 rounded-2xl w-full mt-6 h-40"
+          className="border p-4 rounded-2xl w-full mt-8 h-40"
         ></textarea>
 
-        {/* SUBMIT BUTTON */}
+        {/* SUBMIT */}
 
         <button
 
@@ -302,16 +399,6 @@ export default function AddParkingPage() {
 
               setLoading(true);
 
-              if (!image) {
-
-                alert(
-                  "Please upload image"
-                );
-
-                return;
-
-              }
-
               if (
                 !title ||
                 !location ||
@@ -319,42 +406,72 @@ export default function AddParkingPage() {
               ) {
 
                 alert(
-                  "Please fill all fields"
+                  "Please Fill All Fields"
                 );
 
                 return;
 
               }
 
-              // FETCH USER PROFILE
+              if (
+                images.length === 0
+              ) {
 
-              const userDoc = await getDoc(
-                doc(
-                  db,
-                  "users",
-                  user.uid
-                )
-              );
+                alert(
+                  "Please Upload Images"
+                );
+
+                return;
+
+              }
+
+              // USER PROFILE
+
+              const userDoc =
+                await getDoc(
+
+                  doc(
+                    db,
+                    "users",
+                    user.uid
+                  )
+
+                );
 
               const userData =
                 userDoc.data();
 
-              // IMAGE UPLOAD
+              // IMAGE UPLOADS
 
-              const imageRef = ref(
-                storage,
-                `parking-images/${Date.now()}-${image.name}`
-              );
+              const uploadedImages =
+                [];
 
-              await uploadBytes(
-                imageRef,
-                image
-              );
+              for (const image of images) {
 
-              const imageURL =
-                await getDownloadURL(
-                  imageRef
+                const imageRef =
+                  ref(
+
+                    storage,
+
+                    `parking-images/${Date.now()}-${image.name}`
+
+                  );
+
+                await uploadBytes(
+                  imageRef,
+                  image
                 );
+
+                const imageURL =
+                  await getDownloadURL(
+                    imageRef
+                  );
+
+                uploadedImages.push(
+                  imageURL
+                );
+
+              }
 
               // FIRESTORE SAVE
 
@@ -374,13 +491,25 @@ export default function AddParkingPage() {
 
                 cctv,
 
-                image: imageURL,
+                images:
+                  uploadedImages,
 
-                availability,
+                image:
+                  uploadedImages[0],
 
                 latitude,
 
                 longitude,
+
+                status:
+                  "Pending",
+
+                availability:
+                  "Available",
+
+                featured: false,
+
+                verified: false,
 
                 ownerUid:
                   user.uid,
@@ -392,7 +521,7 @@ export default function AddParkingPage() {
                   userData?.email || "",
 
                 ownerPhoto:
-                  userData?.photo || "",
+                  userData?.photoURL || "",
 
                 ownerPhone:
                   userData?.phone || "",
@@ -406,20 +535,18 @@ export default function AddParkingPage() {
               };
 
               await addDoc(
+
                 collection(
                   db,
                   "parkings"
                 ),
+
                 newParking
+
               );
 
-              setParkings([
-                ...parkings,
-                newParking,
-              ]);
-
               alert(
-                "Parking Added Successfully"
+                "Parking Submitted For Admin Approval"
               );
 
               // RESET
@@ -434,7 +561,7 @@ export default function AddParkingPage() {
 
               setDescription("");
 
-              setImage(null);
+              setImages([]);
 
               setLatitude("");
 
@@ -445,7 +572,7 @@ export default function AddParkingPage() {
               console.log(error);
 
               alert(
-                "Failed To Add Parking"
+                "Failed To Submit Parking"
               );
 
             } finally {
@@ -458,7 +585,8 @@ export default function AddParkingPage() {
 
           disabled={loading}
 
-          className="w-full bg-green-500 text-white py-4 rounded-2xl font-bold text-xl mt-8 disabled:bg-gray-400"
+          className="w-full bg-green-500 text-white py-5 rounded-2xl font-bold text-2xl mt-10 disabled:bg-gray-400"
+
         >
 
           {loading
@@ -469,87 +597,199 @@ export default function AddParkingPage() {
 
       </div>
 
-      {/* SUBMITTED PARKINGS */}
+      {/* OWNER LISTINGS */}
 
-      <div className="max-w-4xl mx-auto mt-10">
+      <div className="max-w-6xl mx-auto mt-14">
 
-        <h2 className="text-3xl font-bold mb-6">
-          Submitted Parking Listings
-        </h2>
+        <div className="flex items-center justify-between mb-8">
 
-        <div className="grid gap-6">
+          <h2 className="text-4xl font-bold">
 
-          {parkings.map(
-            (parking, index) => (
+            Your Parking Listings
+
+          </h2>
+
+          <div className="bg-black text-white px-6 py-3 rounded-2xl font-bold">
+
+            {parkings.length} Listings
+
+          </div>
+
+        </div>
+
+        {parkings.length === 0 ? (
+
+          <div className="bg-white rounded-3xl shadow-xl p-16 text-center">
+
+            <h2 className="text-3xl font-bold mb-4">
+
+              No Listings Found
+
+            </h2>
+
+            <p className="text-gray-500 text-xl">
+
+              Add your first parking listing.
+
+            </p>
+
+          </div>
+
+        ) : (
+
+          <div className="grid gap-8">
+
+            {parkings.map((parking) => (
 
               <div
-                key={index}
-                className="bg-white p-6 rounded-3xl shadow-lg"
+                key={parking.id}
+                className="bg-white rounded-3xl shadow-xl overflow-hidden"
               >
 
-                <img
-                  src={parking.image}
-                  alt={parking.title}
-                  className="w-full h-60 object-cover rounded-2xl mb-4"
-                />
+                <div className="grid md:grid-cols-3">
 
-                <div className="flex items-center gap-4 mb-4">
+                  {/* IMAGE */}
 
                   <img
-                    src={
-                      parking.ownerPhoto ||
-                      "https://via.placeholder.com/100"
-                    }
-                    className="w-14 h-14 rounded-full object-cover"
+                    src={parking.image}
+                    className="w-full h-full object-cover md:h-80"
                   />
 
-                  <div>
+                  {/* CONTENT */}
 
-                    <h3 className="font-bold text-lg">
-                      {parking.ownerName}
-                    </h3>
+                  <div className="md:col-span-2 p-8">
 
-                    <p className="text-gray-500">
-                      {parking.ownerCity}
-                    </p>
+                    <div className="flex flex-col md:flex-row md:justify-between gap-6">
+
+                      <div>
+
+                        {/* BADGES */}
+
+                        <div className="flex flex-wrap gap-3 mb-5">
+
+                          <span
+                            className={`px-5 py-2 rounded-xl font-bold text-white ${
+                              parking.status ===
+                              "Pending"
+                                ? "bg-orange-500"
+                                : "bg-green-500"
+                            }`}
+                          >
+
+                            {parking.status}
+
+                          </span>
+
+                          {parking.featured && (
+
+                            <span className="bg-purple-600 text-white px-5 py-2 rounded-xl font-bold">
+
+                              Featured
+
+                            </span>
+
+                          )}
+
+                          {parking.verified && (
+
+                            <span className="bg-blue-500 text-white px-5 py-2 rounded-xl font-bold">
+
+                              Verified
+
+                            </span>
+
+                          )}
+
+                        </div>
+
+                        <h3 className="text-4xl font-bold mb-4">
+
+                          {parking.title}
+
+                        </h3>
+
+                        <p className="text-gray-500 text-lg mb-4">
+
+                          {parking.location}
+
+                        </p>
+
+                        <p className="text-green-600 font-bold text-2xl mb-6">
+
+                          ₹
+                          {parking.monthlyPrice}
+                          /month
+
+                        </p>
+
+                        {/* OWNER */}
+
+                        <div className="flex items-center gap-4">
+
+                          <img
+                            src={
+                              parking.ownerPhoto ||
+                              "https://ui-avatars.com/api/?name=User&background=16a34a&color=fff"
+                            }
+                            className="w-16 h-16 rounded-full object-cover"
+                          />
+
+                          <div>
+
+                            <h4 className="font-bold text-xl">
+
+                              {parking.ownerName}
+
+                            </h4>
+
+                            <p className="text-gray-500">
+
+                              {parking.ownerCity}
+
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                      </div>
+
+                      {/* ACTIONS */}
+
+                      <div className="flex flex-col gap-4">
+
+                        <a
+                          href={
+                            parking.latitude &&
+                            parking.longitude
+                              ? `https://www.google.com/maps?q=${parking.latitude},${parking.longitude}`
+                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                  parking.location
+                                )}`
+                          }
+                          target="_blank"
+                          className="bg-black text-white px-6 py-4 rounded-2xl font-bold text-center"
+                        >
+
+                          Open Location
+
+                        </a>
+
+                      </div>
+
+                    </div>
 
                   </div>
 
                 </div>
 
-                <h3 className="text-2xl font-bold mb-2">
-                  {parking.title}
-                </h3>
-
-                <p className="text-gray-600 mb-2">
-                  {parking.location}
-                </p>
-
-                <p className="text-green-600 font-bold mb-2">
-                  ₹{parking.monthlyPrice}/month
-                </p>
-
-                <a
-                  href={
-                    parking.latitude &&
-                    parking.longitude
-                      ? `https://www.google.com/maps?q=${parking.latitude},${parking.longitude}`
-                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                          parking.location
-                        )}`
-                  }
-                  target="_blank"
-                  className="inline-block bg-black text-white px-5 py-3 rounded-2xl font-bold mt-4"
-                >
-                  Open Exact Location
-                </a>
-
               </div>
 
-            )
-          )}
+            ))}
 
-        </div>
+          </div>
+
+        )}
 
       </div>
 
