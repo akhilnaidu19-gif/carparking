@@ -16,7 +16,25 @@ import {
 
 import { db } from "@/lib/firebase";
 
+
+
 export default function BookingsPage() {
+
+  const isExpired = (
+  validTill: string
+) => {
+
+  const expiryDate =
+    new Date(validTill);
+
+  const today =
+    new Date();
+
+  return (
+    expiryDate < today
+  );
+
+};
 
   const [bookings, setBookings] = useState<any[]>([]);
   const getBookingStatus = (
@@ -97,20 +115,52 @@ const getDaysRemaining = (
 
       const bookingData: any[] = [];
 
-      querySnapshot.forEach((doc) => {
+      querySnapshot.forEach((docSnapshot) => {
 
-        const data = doc.data();
+  const data =
+    docSnapshot.data();
 
-        if (data.email === userEmail) {
+  if (data.email === userEmail) {
 
-          bookingData.push({
-            id: doc.id,
-            ...data,
-          });
+    if (
+      isExpired(
+        data.validTill
+      )
+    ) {
 
+      updateDoc(
+
+        doc(
+          db,
+          "parkings",
+          data.parkingId
+        ),
+
+        {
+          availability:
+            "Available",
         }
 
-      });
+      ).catch(
+        console.error
+      );
+
+    }
+
+    bookingData.push({
+
+      id:
+        docSnapshot.id,
+
+      ...data,
+
+    });
+
+  }
+
+});
+
+ 
 
       setBookings(bookingData);
 
@@ -164,14 +214,27 @@ const getDaysRemaining = (
       </div>
 
       <span
-        className={`px-5 py-3 rounded-2xl text-white font-bold ${
-          booking.paymentStatus === "Paid"
-            ? "bg-green-500"
-            : "bg-red-500"
-        }`}
-      >
-        {booking.paymentStatus}
-      </span>
+  className={`px-5 py-3 rounded-2xl text-white font-bold ${
+    isExpired(
+      booking.validTill
+    )
+      ? "bg-red-500"
+      : booking.paymentStatus ===
+        "Paid"
+      ? "bg-green-500"
+      : "bg-red-500"
+  }`}
+>
+
+  {isExpired(
+    booking.validTill
+  )
+
+    ? "Expired"
+
+    : booking.paymentStatus}
+
+</span>
 
     </div>
 
@@ -585,6 +648,57 @@ Please share further details.`
   Renew Booking
 
 </button>
+
+{isExpired(
+  booking.validTill
+) && (
+
+  <button
+
+    onClick={async () => {
+
+      try {
+
+        await updateDoc(
+
+          doc(
+            db,
+            "parkings",
+            booking.parkingId
+          ),
+
+          {
+
+            availability:
+              "Available",
+
+          }
+
+        );
+
+        alert(
+          "Parking Released"
+        );
+
+        window.location.reload();
+
+      } catch (error) {
+
+        console.log(error);
+
+      }
+
+    }}
+
+    className="flex-1 bg-green-500 text-white py-4 rounded-2xl font-bold"
+
+  >
+
+    Release Parking
+
+  </button>
+
+)}
 
       <button
 

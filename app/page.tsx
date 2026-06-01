@@ -6,8 +6,14 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import {
+  addDoc,
   collection,
   onSnapshot,
+  query,
+where,
+getDocs,
+deleteDoc,
+doc,
 } from "firebase/firestore";
 
 import {
@@ -22,6 +28,10 @@ export default function Home() {
 
   const [parkingSpots, setParkingSpots] =
     useState<any[]>([]);
+
+    const [wishlistIds,
+  setWishlistIds] =
+  useState<string[]>([]);
 
   const [search, setSearch] =
     useState("");
@@ -168,6 +178,55 @@ const [availableOnly,
 
   }, []);
 
+  useEffect(() => {
+
+  const loadWishlist =
+    async () => {
+
+      const userEmail =
+        localStorage.getItem(
+          "userEmail"
+        );
+
+      if (!userEmail)
+        return;
+
+      const q = query(
+
+        collection(
+          db,
+          "wishlist"
+        ),
+
+        where(
+          "userEmail",
+          "==",
+          userEmail
+        )
+
+      );
+
+      const snapshot =
+        await getDocs(q);
+
+      const ids =
+        snapshot.docs.map(
+
+          (doc) =>
+
+            doc.data()
+              .parkingId
+
+        );
+
+      setWishlistIds(ids);
+
+    };
+
+  loadWishlist();
+
+}, []);
+
   return (
 
     <div className="min-h-screen bg-gray-100 text-gray-900">
@@ -176,7 +235,7 @@ const [availableOnly,
 
       <header className="bg-black text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-xl">
 
-        <h1 className="text-4xl font-bold">
+        <h1 className="text-4xl font-extrabold tracking-tight">
 
   <span className="text-white">
     CarParking
@@ -205,6 +264,10 @@ const [availableOnly,
           <Link href="/contact">
             Contact
           </Link>
+
+          <a href="/wishlist">
+  Wishlist ❤️
+</a>
 
         </nav>
 
@@ -341,31 +404,38 @@ const [availableOnly,
 
       </header>
 
+      
+
       {/* HERO */}
 
 <section
   id="home"
   className="relative min-h-[85vh] bg-cover bg-center"
   style={{
-   backgroundImage:
-  "url('https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=1920&auto=format&fit=crop')"
+backgroundImage:
+"url('https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=1920&auto=format&fit=crop')"
   }}
 >
 
-  <div className="absolute inset-0 bg-black/35"></div>
+  <div className="absolute inset-0 bg-black/55"></div>
 
   <div className="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-16">
 
     <div className="grid lg:grid-cols-2 gap-12 items-center">
 
+      
+
       {/* LEFT CONTENT */}
 
       <div>
 
-        <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+        <h1 className="text-4xl md:text-6xl font-extrabold text-white leading-tight mb-6">
 
-  Find Smart Parking
-  In <span className="text-green-400">Bangalore</span>
+ Find Secure Parking
+
+<span className="block text-green-400">
+  Anywhere In Bangalore
+</span>
 
 </h1>
 
@@ -375,13 +445,62 @@ const [availableOnly,
 
         </p>
 
+        <div className="flex gap-4 mb-8">
+
+  <a
+    href="#parking"
+    className="bg-green-500 text-white px-8 py-4 rounded-2xl font-bold"
+  >
+    Find Parking
+  </a>
+
+  <a
+    href="/add-parking"
+    className="bg-white text-black px-8 py-4 rounded-2xl font-bold"
+  >
+    List Parking
+  </a>
+
+</div>
+
+        <div className="flex gap-8 mt-8">
+
+  <div>
+    <p className="text-4xl font-bold text-green-400">
+      500+
+    </p>
+    <p className="text-gray-300">
+      Parking Spaces
+    </p>
+  </div>
+
+  <div>
+    <p className="text-4xl font-bold text-green-400">
+      100+
+    </p>
+    <p className="text-gray-300">
+      Verified Owners
+    </p>
+  </div>
+
+  <div>
+    <p className="text-4xl font-bold text-green-400">
+      24/7
+    </p>
+    <p className="text-gray-300">
+      Support
+    </p>
+  </div>
+
+</div>
+
       </div>
 
       {/* RIGHT FEATURES */}
 
       <div className="grid grid-cols-2 gap-4">
 
-        <div className="bg-white/10 backdrop-blur-lg border border-gray-700 rounded-2xl p-4">
+        <div className="bg-black/40 backdrop-blur-lg border border-gray-700 rounded-3xl p-4">
 
           <h3 className="text-green-400 font-bold text-1g mb-2">
             Secure Parking
@@ -393,7 +512,7 @@ const [availableOnly,
 
         </div>
 
-        <div className="bg-white/10 backdrop-blur-lg border border-gray-700 rounded-2xl p-4">
+        <div className="bg-black/40 backdrop-blur-lg border border-gray-700 rounded-3xl p-4">
 
           <h3 className="text-green-400 font-bold text-lg mb-2">
             Best Prices
@@ -405,7 +524,7 @@ const [availableOnly,
 
         </div>
 
-        <div className="bg-white/10 backdrop-blur-lg border border-gray-700 rounded-2xl p-4">
+        <div className="bg-black/40 backdrop-blur-lg border border-gray-700 rounded-3xl p-4">
 
           <h3 className="text-green-400 font-bold text-lg mb-2">
             Easy Booking
@@ -417,7 +536,7 @@ const [availableOnly,
 
         </div>
 
-        <div className="bg-white/10 backdrop-blur-lg border border-gray-700 rounded-2xl p-4">
+        <div className="bg-black/40 backdrop-blur-lg border border-gray-700 rounded-3xl p-4">
 
           <h3 className="text-green-400 font-bold text-lg mb-2">
             Prime Locations
@@ -435,9 +554,9 @@ const [availableOnly,
 
     {/* SEARCH BAR */}
 
-    <div className="bg-white rounded-3xl shadow-2xl p-4 mt-12">
+    <div className="bg-white rounded-3xl shadow-2xl p-3 mt-12 relative z-20 max-w-6xl mx-auto">
 
-      <div className="grid lg:grid-cols-5 gap-4">
+      <div className="flex items-center gap-3">
 
         <input
           type="text"
@@ -446,7 +565,7 @@ const [availableOnly,
           onChange={(e) =>
             setSearch(e.target.value)
           }
-          className="border py-3 px-4 rounded-2xl"
+          className="border border-gray-200 py-2 px-4 rounded-xl"
         />
 
         <select
@@ -456,7 +575,7 @@ const [availableOnly,
               e.target.value
             )
           }
-          className="border py-3 px-4 rounded-2xl"
+          className="w-48 border border-gray-200 py-3 px-4 rounded-xl"
         >
 
           <option value="All">
@@ -480,7 +599,7 @@ const [availableOnly,
               e.target.value
             )
           }
-          className="border py-3 px-4 rounded-2xl"
+          className="w-48 border border-gray-200 py-3 px-4 rounded-xl"
         >
 
           <option value="All">
@@ -505,7 +624,7 @@ const [availableOnly,
 
         </select>
 
-        <label className="flex items-center justify-center gap-3 border rounded-2xl px-4">
+        <label className="w-56 flex items-center justify-center gap-3 border rounded-xl px-4">
 
           <input
             type="checkbox"
@@ -543,7 +662,7 @@ const [availableOnly,
 
           }}
 
-          className="bg-black text-white rounded-2xl font-bold"
+          className="bg-black text-white px-8 py-3 rounded-xl font-semibold"
 
         >
 
@@ -557,9 +676,9 @@ const [availableOnly,
 
     {/* TRUST BAR */}
 
-    <div className="grid md:grid-cols-4 gap-6 mt-10">
+    <div className="grid md:grid-cols-4 gap-4 mt-6">
 
-      <div className="bg-white rounded-2xl p-6 text-center">
+      <div className="bg-white rounded-2xl p-4 text-center shadow-lg">
 
         <h3 className="font-bold text-lg">
           📍 Wide Coverage
@@ -571,7 +690,7 @@ const [availableOnly,
 
       </div>
 
-      <div className="bg-white rounded-2xl p-6 text-center">
+      <div className="bg-white rounded-2xl p-4 text-center shadow-lg">
 
         <h3 className="font-bold text-lg">
           ✅ Verified Owners
@@ -583,7 +702,7 @@ const [availableOnly,
 
       </div>
 
-      <div className="bg-white rounded-2xl p-6 text-center">
+      <div className="bg-white rounded-2xl p-4 text-center shadow-lg">
 
         <h3 className="font-bold text-lg">
           🎧 24/7 Support
@@ -595,7 +714,7 @@ const [availableOnly,
 
       </div>
 
-      <div className="bg-white rounded-2xl p-6 text-center">
+      <div className="bg-white rounded-2xl p-4 text-center shadow-lg">
 
         <h3 className="font-bold text-lg">
           💰 No Hidden Charges
@@ -662,7 +781,8 @@ const [availableOnly,
 
           ) : (
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
+              
 
               {parkingSpots
 
@@ -731,6 +851,8 @@ const [availableOnly,
       Number(maxPrice)
 
 )
+
+
 
                 // FEATURED FIRST
 
@@ -824,7 +946,7 @@ const [availableOnly,
 
                   <div
   key={spot.id}
-  className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
+  className="min-w-[350px] max-w-[350px] bg-white rounded-3xl shadow-lg overflow-hidden"
 >
 
                     <div className="relative">
@@ -842,11 +964,151 @@ const [availableOnly,
 
   <div className="absolute top-3 right-3">
 
-  <button className="bg-white w-10 h-10 rounded-full shadow-lg hover:scale-110 transition">
+<button
 
-    ❤️
+  onClick={async () => {
 
-  </button>
+    try {
+
+      const userEmail =
+        localStorage.getItem(
+          "userEmail"
+        );
+
+      if (!userEmail) {
+
+        alert(
+          "Please Login First"
+        );
+
+        return;
+
+      }
+
+      const q = query(
+
+        collection(
+          db,
+          "wishlist"
+        ),
+
+        where(
+          "userEmail",
+          "==",
+          userEmail
+        ),
+
+        where(
+          "parkingId",
+          "==",
+          spot.id
+        )
+
+      );
+
+      const snapshot =
+        await getDocs(q);
+
+      if (!snapshot.empty) {
+
+        const wishlistDoc =
+          snapshot.docs[0];
+
+        await deleteDoc(
+
+          
+
+          doc(
+            db,
+            "wishlist",
+            wishlistDoc.id
+          )
+
+        );
+
+        setWishlistIds(
+
+  wishlistIds.filter(
+
+    (id) =>
+      id !== spot.id
+
+  )
+
+);
+
+        alert(
+          "Removed From Wishlist"
+        );
+
+        return;
+
+      }
+
+      await addDoc(
+
+        collection(
+          db,
+          "wishlist"
+        ),
+
+        {
+
+          userEmail,
+
+          parkingId:
+            spot.id,
+
+          title:
+            spot.title,
+
+          image:
+            spot.image,
+
+          location:
+            spot.location,
+
+          monthlyPrice:
+            spot.monthlyPrice,
+
+          createdAt:
+            new Date(),
+
+        }
+
+      );
+
+      setWishlistIds([
+
+  ...wishlistIds,
+
+  spot.id,
+
+]);
+
+      alert(
+        "Added To Wishlist ❤️"
+      );
+
+    } catch (error) {
+
+      console.log(error);
+
+    }
+
+  }}
+
+  className="bg-white w-10 h-10 rounded-full shadow-lg hover:scale-110 transition"
+
+>
+
+  {wishlistIds.includes(
+  spot.id
+)
+  ? "❤️"
+  : "🤍"}
+
+</button> 
 
 </div>
 
@@ -1099,7 +1361,7 @@ const [availableOnly,
 
           <div>
 
-            <h3 className="text-2xl font-bold mb-4">
+            <h3 className="text-xl font-bold mb-4">
 
               CarParking Bangalore
 
