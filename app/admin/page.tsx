@@ -58,6 +58,12 @@ export default function AdminPage() {
   const [notification, setNotification] =
     useState("");
 
+    const [tickets, setTickets] =
+  useState<any[]>([]);
+
+const [remarks, setRemarks] =
+  useState<{ [key: string]: string }>({});
+
   const router = useRouter();
 
   const auth = getAuth();
@@ -268,6 +274,47 @@ export default function AdminPage() {
 
   }, []);
 
+  // FETCH SUPPORT TICKETS
+
+useEffect(() => {
+
+  const unsubscribe =
+    onSnapshot(
+
+      collection(
+        db,
+        "supportTickets"
+      ),
+
+      (snapshot) => {
+
+        const ticketData: any[] =
+          [];
+
+        snapshot.forEach((doc) => {
+
+          ticketData.push({
+
+            id: doc.id,
+
+            ...doc.data(),
+
+          });
+
+        });
+
+        setTickets(
+          ticketData
+        );
+
+      }
+
+    );
+
+  return () => unsubscribe();
+
+}, []);
+
   if (!authorized) {
 
     return (
@@ -362,6 +409,34 @@ export default function AdminPage() {
         item.online === true
     ).length;
 
+    const openTickets =
+  tickets.filter(
+    (ticket) =>
+      (ticket.status || "Open") ===
+      "Open"
+  ).length;
+
+const progressTickets =
+  tickets.filter(
+    (ticket) =>
+      ticket.status ===
+      "In Progress"
+  ).length;
+
+const waitingTickets =
+  tickets.filter(
+    (ticket) =>
+      ticket.status ===
+      "Waiting For Customer"
+  ).length;
+
+const resolvedTickets =
+  tickets.filter(
+    (ticket) =>
+      ticket.status ===
+      "Resolved"
+  ).length;
+
   // CHART DATA
 
   const chartData = [
@@ -454,7 +529,7 @@ export default function AdminPage() {
 
         {/* STATS */}
 
-        <div className="grid md:grid-cols-6 gap-6 mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-6 mb-10">
 
           <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-8 rounded-3xl shadow-xl">
 
@@ -538,19 +613,33 @@ export default function AdminPage() {
 
           <div className="bg-gradient-to-r from-black to-gray-800 text-white p-8 rounded-3xl shadow-xl">
 
-            <p className="text-lg mb-3">
+  <p className="text-lg mb-3">
+    Revenue
+  </p>
 
-              Revenue
+  <h2 className="text-5xl font-bold">
+    ₹{totalRevenue}
+  </h2>
 
-            </p>
+</div>
 
-            <h2 className="text-5xl font-bold">
+<div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-8 rounded-3xl shadow-xl">
 
-              ₹{totalRevenue}
+  <p className="text-lg mb-3">
+    Total Tickets
+  </p>
 
-            </h2>
+  
 
-          </div>
+  <h2 className="text-5xl font-bold">
+    {tickets.length}
+  </h2>
+
+  
+
+</div>
+
+
 
         </div>
 
@@ -634,6 +723,237 @@ export default function AdminPage() {
           </div>
 
         </div>
+
+        {/* SUPPORT ANALYTICS */}
+
+<div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
+
+  <div className="flex items-center justify-between mb-8">
+
+    <h2 className="text-4xl font-bold">
+      🎫 Support Analytics
+    </h2>
+
+    <div className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold">
+      {tickets.length} Tickets
+    </div>
+
+  </div>
+
+  <div className="grid md:grid-cols-4 gap-6">
+
+    <div className="bg-yellow-500 text-white p-6 rounded-3xl">
+
+      <p className="text-lg">
+        Open
+      </p>
+
+      <h2 className="text-5xl font-bold">
+        {openTickets}
+      </h2>
+
+    </div>
+
+    <div className="bg-blue-500 text-white p-6 rounded-3xl">
+
+      <p className="text-lg">
+        In Progress
+      </p>
+
+      <h2 className="text-5xl font-bold">
+        {progressTickets}
+      </h2>
+
+    </div>
+
+    <div className="bg-orange-500 text-white p-6 rounded-3xl">
+
+      <p className="text-lg">
+        Waiting
+      </p>
+
+      <h2 className="text-5xl font-bold">
+        {waitingTickets}
+      </h2>
+
+    </div>
+
+    <div className="bg-green-600 text-white p-6 rounded-3xl">
+
+      <p className="text-lg">
+        Resolved
+      </p>
+
+      <h2 className="text-5xl font-bold">
+        {resolvedTickets}
+      </h2>
+
+    </div>
+
+  </div>
+
+  <div className="mt-8 bg-gray-100 rounded-3xl p-6">
+
+    <h3 className="text-2xl font-bold mb-4">
+      Support Performance
+    </h3>
+
+    <div className="grid md:grid-cols-2 gap-6">
+
+      <div>
+
+        <p className="text-gray-500">
+          Total Tickets
+        </p>
+
+        <h2 className="text-4xl font-bold">
+          {tickets.length}
+        </h2>
+
+      </div>
+
+      <div>
+
+        <p className="text-gray-500">
+          Resolution Rate
+        </p>
+
+        <h2 className="text-4xl font-bold text-green-600">
+
+          {tickets.length > 0
+            ? Math.round(
+                (resolvedTickets /
+                  tickets.length) *
+                  100
+              )
+            : 0}
+
+          %
+
+        </h2>
+
+      </div>
+
+    </div>
+
+  </div>
+
+{/* RECENT TICKETS */}
+
+<div className="mt-10">
+
+  <h3 className="text-2xl font-bold mb-5">
+
+    Recent Support Tickets
+
+  </h3>
+
+  <div className="overflow-x-auto">
+
+    <table className="w-full">
+
+      <thead>
+
+        <tr className="bg-gray-100">
+
+          <th className="p-4 text-left">
+            Ticket ID
+          </th>
+
+          <th className="p-4 text-left">
+            User
+          </th>
+
+          <th className="p-4 text-left">
+            Subject
+          </th>
+
+          <th className="p-4 text-left">
+            Priority
+          </th>
+
+          <th className="p-4 text-left">
+            Status
+          </th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        {tickets
+
+          .slice(0, 5)
+
+          .map((ticket) => (
+
+            <tr
+              key={ticket.id}
+              className="border-b"
+            >
+
+              <td className="p-4 font-semibold">
+
+                {ticket.ticketId}
+
+              </td>
+
+              <td className="p-4">
+
+                {ticket.userName}
+
+              </td>
+
+              <td className="p-4">
+
+                {ticket.subject}
+
+              </td>
+
+              <td className="p-4">
+
+                {ticket.priority}
+
+              </td>
+
+              <td className="p-4">
+
+                <span
+                  className={`px-3 py-1 rounded-full text-white text-sm font-bold ${
+                    ticket.status ===
+                    "Resolved"
+                      ? "bg-green-500"
+                      : ticket.status ===
+                        "In Progress"
+                      ? "bg-blue-500"
+                      : ticket.status ===
+                        "Waiting For Customer"
+                      ? "bg-orange-500"
+                      : "bg-red-500"
+                  }`}
+                >
+
+                  {ticket.status ||
+                    "Open"}
+
+                </span>
+
+              </td>
+
+            </tr>
+
+          ))}
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+</div>
+
+</div>
 
         {/* SEARCH */}
 
@@ -1420,6 +1740,237 @@ export default function AdminPage() {
     ))}
 
     </div>
+
+    {/* SUPPORT TICKETS */}
+
+<div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
+
+  <div className="flex items-center justify-between mb-8">
+
+    <h2 className="text-4xl font-bold">
+
+      Support Tickets
+
+    </h2>
+
+    <div className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold">
+
+      {tickets.length} Tickets
+
+    </div>
+
+  </div>
+
+  <div className="grid gap-6">
+
+    {tickets.map((ticket) => (
+
+      <div
+
+        key={ticket.id}
+
+        className="bg-gray-50 border rounded-3xl p-6"
+
+      >
+
+        <div className="flex justify-between items-start">
+
+          <div>
+
+            <h3 className="text-2xl font-bold">
+  {ticket.subject}
+</h3>
+
+<p className="text-gray-500">
+  Ticket ID :
+  {ticket.ticketId}
+</p>
+
+<p className="text-gray-500">
+  User :
+  {ticket.userName}
+</p>
+
+<p className="text-gray-500">
+  Email :
+  {ticket.userEmail}
+</p>
+
+<p className="text-gray-500">
+  Priority :
+  {ticket.priority}
+</p>
+
+            <p className="mt-4">
+
+              {ticket.message}
+
+            </p>
+
+            <div className="mt-5">
+
+  <h4 className="font-bold mb-2">
+    Admin Remarks
+  </h4>
+
+  <textarea
+    value={
+      remarks[ticket.id] ??
+      ticket.adminRemarks ??
+      ""
+    }
+    onChange={(e) =>
+      setRemarks({
+        ...remarks,
+        [ticket.id]:
+          e.target.value,
+      })
+    }
+    className="w-full border p-3 rounded-xl h-24"
+  />
+
+</div>
+
+          </div>
+
+          <select
+  value={ticket.status || "Open"}
+  onChange={async (e) => {
+
+    await updateDoc(
+      doc(
+        db,
+        "supportTickets",
+        ticket.id
+      ),
+      {
+        status:
+          e.target.value,
+      }
+    );
+
+  }}
+  className="border p-3 rounded-xl"
+>
+
+  <option>
+    Open
+  </option>
+
+  <option>
+    In Progress
+  </option>
+
+  <option>
+    Waiting For Customer
+  </option>
+
+  <option>
+    Resolved
+  </option>
+
+</select>
+
+        </div>
+
+       <div className="flex flex-wrap gap-4 mt-6">
+
+          <button
+
+            onClick={async () => {
+
+              await updateDoc(
+
+                doc(
+                  db,
+                  "supportTickets",
+                  ticket.id
+                ),
+
+                {
+                  status:
+                    "Resolved",
+                }
+
+              );
+
+            }}
+
+            className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold"
+
+          >
+
+            Mark Resolved
+
+          </button>
+
+<button
+
+  onClick={async () => {
+
+    await updateDoc(
+
+      doc(
+        db,
+        "supportTickets",
+        ticket.id
+      ),
+
+      {
+        adminRemarks:
+          remarks[ticket.id] ||
+          "",
+      }
+
+    );
+
+    alert(
+      "Remarks Updated"
+    );
+
+  }}
+
+  className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold"
+
+>
+
+  Save Remarks
+
+</button>
+
+          <button
+
+            onClick={async () => {
+
+              await deleteDoc(
+
+                doc(
+                  db,
+                  "supportTickets",
+                  ticket.id
+                )
+
+              );
+
+            }}
+
+            className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold"
+
+          >
+
+            Delete Ticket
+
+          </button>
+
+        </div>
+
+      </div>
+
+    ))}
+
+  </div>
+
+</div>
 
 </div>
 

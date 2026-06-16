@@ -62,6 +62,12 @@ const [availableOnly,
 
   const auth = getAuth(app);
 
+  const [locationText, setLocationText] =
+  useState("");
+
+  const [filteredSpots, setFilteredSpots] =
+  useState<any[]>([]);
+
   // DISTANCE CALCULATION
 
   const calculateDistance = (
@@ -160,6 +166,10 @@ const [availableOnly,
             parkingData
           );
 
+          setFilteredSpots(
+  parkingData
+);
+
           setLoading(false);
 
         },
@@ -227,182 +237,67 @@ const [availableOnly,
 
 }, []);
 
+const handleSearch = () => {
+
+  const results = parkingSpots
+
+    .filter(
+      (spot) =>
+        spot.status === "Approved"
+    )
+
+    .filter(
+      (spot) =>
+        spot.location
+          ?.toLowerCase()
+          .includes(search.toLowerCase())
+
+        ||
+
+        spot.title
+          ?.toLowerCase()
+          .includes(search.toLowerCase())
+    )
+
+    .filter(
+      (spot) =>
+
+        parkingTypeFilter === "All"
+
+          ? true
+
+          : spot.parkingType === parkingTypeFilter
+    )
+
+    .filter(
+      (spot) =>
+
+        availableOnly
+
+          ? spot.availability === "Available"
+
+          : true
+    )
+
+    .filter(
+      (spot) =>
+
+        maxPrice === "All"
+
+          ? true
+
+          : Number(spot.monthlyPrice) <= Number(maxPrice)
+    );
+
+  setFilteredSpots(results);
+
+};
+
   return (
 
     <div className="min-h-screen bg-gray-100 text-gray-900">
 
-      {/* HEADER */}
-
-      <header className="bg-black text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-xl">
-
-        <h1 className="text-4xl font-extrabold tracking-tight">
-
-  <span className="text-white">
-    CarParking
-  </span>
-
-  <span className="text-green-400">
-    Bangalore
-  </span>
-
-</h1>
-
-        <nav className="hidden md:flex gap-8 font-medium">
-
-          <a href="#home">
-            Home
-          </a>
-
-          <a href="#parking">
-            Search Parking
-          </a>
-
-          <a href="#owners">
-            List Parking
-          </a>
-
-          <Link href="/contact">
-            Contact
-          </Link>
-
-          <a href="/wishlist">
-  Wishlist ❤️
-</a>
-
-        </nav>
-
-        <div className="flex items-center gap-4">
-
-          {user ? (
-
-            <div className="relative group">
-
-              <img
-                src={
-                  user.photoURL ||
-                  "https://via.placeholder.com/50"
-                }
-                className="w-12 h-12 rounded-full object-cover border-2 border-green-500 cursor-pointer"
-              />
-
-              <div className="absolute right-0 mt-3 w-72 bg-white text-black rounded-3xl shadow-2xl p-6 hidden group-hover:block z-50">
-
-                <div className="flex items-center gap-4 mb-5">
-
-                  <img
-                    src={
-                      user.photoURL ||
-                      "https://via.placeholder.com/50"
-                    }
-                    className="w-16 h-16 rounded-full object-cover"
-                  />
-
-                  <div>
-
-                    <h3 className="font-bold text-xl">
-
-                      {user.displayName ||
-                        "User"}
-
-                    </h3>
-
-                    <p className="text-sm text-gray-500">
-
-                      {user.email}
-
-                    </p>
-
-                  </div>
-
-                </div>
-
-                <div className="flex flex-col gap-3">
-
-                  <Link
-                    href="/profile"
-                    className="bg-green-500 text-white text-center py-3 rounded-2xl font-bold"
-                  >
-
-                    My Profile
-
-                  </Link>
-
-                  <Link
-                    href="/bookings"
-                    className="bg-black text-white text-center py-3 rounded-2xl font-bold"
-                  >
-
-                    My Bookings
-
-                  </Link>
-
-                  <Link
-                    href="/dashboard"
-                    className="bg-blue-500 text-white text-center py-3 rounded-2xl font-bold"
-                  >
-
-                    Dashboard
-
-                  </Link>
-
-                  <button
-
-                    onClick={async () => {
-
-                      await signOut(
-                        auth
-                      );
-
-                      localStorage.clear();
-
-                      window.location.href =
-                        "/";
-
-                    }}
-
-                    className="w-full bg-red-500 text-white py-3 rounded-2xl font-bold"
-
-                  >
-
-                    Logout
-
-                  </button>
-
-                </div>
-
-              </div>
-
-            </div>
-
-          ) : (
-
-            <>
-
-              <Link
-                href="/login"
-                className="bg-white text-black px-5 py-2 rounded-xl font-semibold"
-              >
-
-                Login
-
-              </Link>
-
-              <Link
-                href="/signup"
-                className="bg-green-500 px-5 py-2 rounded-xl font-semibold"
-              >
-
-                Register
-
-              </Link>
-
-            </>
-
-          )}
-
-        </div>
-
-      </header>
+   
 
       
 
@@ -556,121 +451,167 @@ backgroundImage:
 
     <div className="bg-white rounded-3xl shadow-2xl p-3 mt-12 relative z-20 max-w-6xl mx-auto">
 
-      <div className="flex items-center gap-3">
+     <div className="space-y-3">
 
-        <input
-          type="text"
-          placeholder="Search location or parking name"
-          value={search}
-          onChange={(e) =>
-            setSearch(e.target.value)
-          }
-          className="border border-gray-200 py-2 px-4 rounded-xl"
-        />
+  {/* FIRST ROW */}
 
-        <select
-          value={parkingTypeFilter}
-          onChange={(e) =>
-            setParkingTypeFilter(
-              e.target.value
-            )
-          }
-          className="w-48 border border-gray-200 py-3 px-4 rounded-xl"
-        >
+  <div className="flex gap-3 items-center">
 
-          <option value="All">
-            All Types
-          </option>
+    <input
+      type="text"
+      placeholder="Search location, area or parking name..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      className="flex-1 border border-gray-300 py-4 px-5 rounded-xl"
+    />
 
-          <option value="Covered Parking">
-            Covered Parking
-          </option>
+<button
+  onClick={handleSearch}
+  className="bg-green-500 text-white px-8 py-4 rounded-xl font-semibold"
+>
+  🔍 Search
+</button>
 
-          <option value="Open Parking">
-            Open Parking
-          </option>
+    <button
+      onClick={() => {
 
-        </select>
+        navigator.geolocation.getCurrentPosition(
 
-        <select
-          value={maxPrice}
-          onChange={(e) =>
-            setMaxPrice(
-              e.target.value
-            )
-          }
-          className="w-48 border border-gray-200 py-3 px-4 rounded-xl"
-        >
+          async (position) => {
 
-          <option value="All">
-            Any Price
-          </option>
+            const lat =
+              position.coords.latitude;
 
-          <option value="1000">
-            Under ₹1000
-          </option>
+            const lng =
+              position.coords.longitude;
 
-          <option value="2000">
-            Under ₹2000
-          </option>
+            setUserLatitude(lat);
+            setUserLongitude(lng);
 
-          <option value="3000">
-            Under ₹3000
-          </option>
+            try {
 
-          <option value="5000">
-            Under ₹5000
-          </option>
+              const response =
+                await fetch(
+                  `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
+                );
 
-        </select>
+              const data =
+                await response.json();
 
-        <label className="w-56 flex items-center justify-center gap-3 border rounded-xl px-4">
+              const area =
+                data.address?.suburb ||
+                data.address?.city ||
+                data.address?.town ||
+                data.display_name;
 
-          <input
-            type="checkbox"
-            checked={availableOnly}
-            onChange={(e) =>
-              setAvailableOnly(
-                e.target.checked
-              )
+              setSearch(area);
+              setLocationText(area);
+
+            } catch (error) {
+
+              console.log(error);
+
             }
-          />
 
-          Available Only
+          }
 
-        </label>
+        );
 
-        <button
+      }}
+      className="bg-black text-white px-8 py-4 rounded-xl font-semibold"
+    >
+      📍 Use My Location
+    </button>
 
-          onClick={() => {
+  </div>
 
-            navigator.geolocation.getCurrentPosition(
+  {/* SECOND ROW */}
 
-              (position) => {
+  <div className="flex gap-3 items-center">
 
-                setUserLatitude(
-                  position.coords.latitude
-                );
+    <select
+      value={parkingTypeFilter}
+      onChange={(e) =>
+        setParkingTypeFilter(
+          e.target.value
+        )
+      }
+      className="flex-1 border border-gray-300 py-3 px-4 rounded-xl"
+    >
+      <option value="All">
+        All Types
+      </option>
 
-                setUserLongitude(
-                  position.coords.longitude
-                );
+      <option value="Covered Parking">
+        Covered Parking
+      </option>
 
-              }
+      <option value="Open Parking">
+        Open Parking
+      </option>
+    </select>
 
-            );
+    <select
+      value={maxPrice}
+      onChange={(e) =>
+        setMaxPrice(
+          e.target.value
+        )
+      }
+      className="flex-1 border border-gray-300 py-3 px-4 rounded-xl"
+    >
+      <option value="All">
+        Any Price
+      </option>
 
-          }}
+      <option value="1000">
+        Under ₹1000
+      </option>
 
-          className="bg-black text-white px-8 py-3 rounded-xl font-semibold"
+      <option value="2000">
+        Under ₹2000
+      </option>
 
-        >
+      <option value="3000">
+        Under ₹3000
+      </option>
 
-          Use My Location
+      <option value="5000">
+        Under ₹5000
+      </option>
+    </select>
 
-        </button>
+    <label className="flex items-center gap-3 border border-gray-300 rounded-xl px-6 py-3">
 
-      </div>
+      <input
+        type="checkbox"
+        checked={availableOnly}
+        onChange={(e) =>
+          setAvailableOnly(
+            e.target.checked
+          )
+        }
+      />
+
+      Available Only
+
+    </label>
+
+  </div>
+
+  {locationText && (
+
+    <p className="text-sm text-green-600 font-medium">
+
+      📍 Current Location:
+      {" "}
+      {locationText}
+
+    </p>
+
+  )}
+
+</div>
 
     </div>
 
@@ -784,73 +725,11 @@ backgroundImage:
             <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
               
 
-              {parkingSpots
+              {filteredSpots
 
                 // ONLY APPROVED
 
-                .filter(
-
-                  (spot) =>
-                    spot.status ===
-                    "Approved"
-
-                )
-
-                // SEARCH
-
-                .filter((spot) =>
-
-  spot.location
-    ?.toLowerCase()
-    .includes(
-      search.toLowerCase()
-    )
-
-  ||
-
-  spot.title
-    ?.toLowerCase()
-    .includes(
-      search.toLowerCase()
-    )
-
-)
-
-.filter((spot) =>
-
-  parkingTypeFilter ===
-    "All"
-
-    ? true
-
-    : spot.parkingType ===
-      parkingTypeFilter
-
-)
-
-.filter((spot) =>
-
-  availableOnly
-
-    ? spot.availability ===
-      "Available"
-
-    : true
-
-)
-
-.filter((spot) =>
-
-  maxPrice === "All"
-
-    ? true
-
-    : Number(
-        spot.monthlyPrice
-      ) <=
-      Number(maxPrice)
-
-)
+                
 
 
 
@@ -1285,23 +1164,12 @@ backgroundImage:
 
                         </Link>
 
-                        <a
-                          href={
-                            spot.latitude &&
-                            spot.longitude
-                              ? `https://www.google.com/maps?q=${spot.latitude},${spot.longitude}`
-                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                                  spot.location
-                                )}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 text-center bg-black text-white py-3 rounded-2xl font-bold"
-                        >
-
-                          View Map
-
-                        </a>
+<Link
+  href={`/parking/${spot.id}`}
+  className="flex-1 text-center bg-black text-white py-3 rounded-2xl font-bold"
+>
+  View Details
+</Link>
 
                       </div>
 
@@ -1353,95 +1221,7 @@ backgroundImage:
 
       </section>
 
-      {/* FOOTER */}
-
-      <footer className="bg-black text-white py-12 px-6">
-
-        <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-10">
-
-          <div>
-
-            <h3 className="text-xl font-bold mb-4">
-
-              CarParking Bangalore
-
-            </h3>
-
-            <p className="text-gray-400">
-
-              Smart parking marketplace for customers and owners.
-
-            </p>
-
-          </div>
-
-          <div>
-
-            <h4 className="font-bold mb-4">
-
-              Quick Links
-
-            </h4>
-
-            <ul className="space-y-2 text-gray-400">
-
-              <li>
-                <Link href="/">
-                  Home
-                </Link>
-              </li>
-
-              <li>
-                <Link href="/bookings">
-                  Bookings
-                </Link>
-              </li>
-
-              <li>
-                <Link href="/dashboard">
-                  Dashboard
-                </Link>
-              </li>
-
-            </ul>
-
-          </div>
-
-          <div>
-
-            <h4 className="font-bold mb-4">
-
-              Contact
-
-            </h4>
-
-            <ul className="space-y-2 text-gray-400">
-
-              <li>
-                Bangalore, India
-              </li>
-
-              <li>
-                akhilnaidu19@gmail.com
-              </li>
-
-              <li>
-                +91 9206687300
-              </li>
-
-            </ul>
-
-          </div>
-
-        </div>
-
-        <div className="border-t border-gray-700 mt-10 pt-6 text-center text-gray-500">
-
-          © 2026 CarParking Bangalore
-
-        </div>
-
-      </footer>
+      
 
     </div>
 

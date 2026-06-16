@@ -626,58 +626,41 @@ phone:
 
           </div>
 
-          {/* BUTTONS */}
+          <div className="bg-yellow-50 border border-yellow-300 p-6 rounded-3xl mb-8">
 
-          <div className="flex flex-col md:flex-row gap-4 mb-8">
+  <h3 className="text-2xl font-bold mb-2">
+    🔒 Exact Location Hidden
+  </h3>
 
-            <a
-              href={
-                parking.latitude &&
-                parking.longitude
-                  ? `https://www.google.com/maps?q=${parking.latitude},${parking.longitude}`
-                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      parking.location
-                    )}`
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-black text-white px-6 py-4 rounded-2xl font-bold text-center"
-            >
+  <p className="text-gray-600">
+    Exact parking location and directions will be available after successful booking.
+  </p>
 
-              Open Exact Location
+</div>
 
-            </a>
+        <div className="bg-white p-8 rounded-3xl shadow-lg mb-8">
 
-          </div>
+  <h2 className="text-3xl font-bold mb-4">
+    Parking Location
+  </h2>
 
-          {/* MAP */}
+  <p className="text-xl font-semibold text-green-600 mb-4">
+    📍 {parking.location}
+  </p>
 
-          {parking.latitude &&
-            parking.longitude && (
+  <div className="bg-gray-100 rounded-2xl p-10 text-center">
 
-              <div className="bg-white p-6 rounded-3xl shadow-lg mb-8">
+    <h3 className="text-2xl font-bold mb-3">
+      🔒 Exact Location Hidden
+    </h3>
 
-                <h2 className="text-3xl font-bold mb-6">
+    <p className="text-gray-600">
+      To protect parking owners, the exact address and map directions are available only after booking confirmation.
+    </p>
 
-                  Parking Location
+  </div>
 
-                </h2>
-
-                <iframe
-                  src={`https://maps.google.com/maps?q=${parking.latitude},${parking.longitude}&z=15&output=embed`}
-                  width="100%"
-                  height="400"
-                  style={{
-                    border: 0,
-                    borderRadius:
-                      "20px",
-                  }}
-                  loading="lazy"
-                ></iframe>
-
-              </div>
-
-            )}
+</div>
 
           {/* DETAILS */}
 
