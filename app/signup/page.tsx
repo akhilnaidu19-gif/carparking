@@ -220,8 +220,11 @@ export default function SignupPage() {
 
                   photo: imageURL,
 
+                  role: "user",
+
                   createdAt:
                     new Date(),
+                    
 
                 }
 

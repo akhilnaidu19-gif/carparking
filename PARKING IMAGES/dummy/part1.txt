@@ -1,0 +1,718 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import {
+  collection,
+  onSnapshot,
+  deleteDoc,
+  doc,
+  updateDoc,
+  addDoc,
+} from "firebase/firestore";
+
+import {
+  getAuth,
+  onAuthStateChanged,
+} from "firebase/auth";
+
+import { useRouter } from "next/navigation";
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+
+import { db } from "@/lib/firebase";
+
+export default function AdminPage() {
+
+  const [parkings, setParkings] =
+    useState<any[]>([]);
+
+  const [bookings, setBookings] =
+    useState<any[]>([]);
+
+  const [users, setUsers] =
+    useState<any[]>([]);
+
+  const [logins, setLogins] =
+    useState<any[]>([]);
+
+  const [authorized, setAuthorized] =
+    useState(false);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [filter, setFilter] =
+    useState("All");
+
+  const [notification, setNotification] =
+    useState("");
+
+    const [tickets, setTickets] =
+  useState<any[]>([]);
+
+  const [activeSection, setActiveSection] =
+  useState("dashboard");
+
+const [remarks, setRemarks] =
+  useState<{ [key: string]: string }>({});
+
+  const [ticketCategoryFilter,
+  setTicketCategoryFilter] =
+  useState("All");
+
+  const router = useRouter();
+
+  const auth = getAuth();
+
+  // ADMIN AUTH
+
+  useEffect(() => {
+
+    const unsubscribe =
+      onAuthStateChanged(
+
+        auth,
+
+        (currentUser) => {
+
+          if (!currentUser) {
+
+            router.push("/login");
+
+            return;
+
+          }
+
+          if (
+            currentUser.email ===
+            "akhilnaidu19@gmail.com"
+          ) {
+
+            setAuthorized(true);
+
+          } else {
+
+            alert(
+              "Access Denied"
+            );
+
+            router.push("/");
+
+          }
+
+        }
+
+      );
+
+    return () => unsubscribe();
+
+  }, []);
+
+  // FETCH PARKINGS
+
+  useEffect(() => {
+
+    const unsubscribe =
+      onSnapshot(
+
+        collection(db, "parkings"),
+
+        (snapshot) => {
+
+          const parkingData: any[] =
+            [];
+
+          snapshot.forEach((doc) => {
+
+            parkingData.push({
+
+              id: doc.id,
+
+              ...doc.data(),
+
+            });
+
+          });
+
+          setParkings(
+            parkingData
+          );
+
+        }
+
+      );
+
+    return () => unsubscribe();
+
+  }, []);
+
+  // FETCH BOOKINGS
+
+  useEffect(() => {
+
+    const unsubscribe =
+      onSnapshot(
+
+        collection(db, "bookings"),
+
+        (snapshot) => {
+
+          const bookingData: any[] =
+            [];
+
+          snapshot.forEach((doc) => {
+
+            bookingData.push({
+
+              id: doc.id,
+
+              ...doc.data(),
+
+            });
+
+          });
+
+          setBookings(
+            bookingData
+          );
+
+          setNotification(
+            "New Booking Received"
+          );
+
+          setTimeout(() => {
+
+            setNotification("");
+
+          }, 3000);
+
+        }
+
+      );
+
+    return () => unsubscribe();
+
+  }, []);
+
+  // FETCH USERS
+
+  useEffect(() => {
+
+    const unsubscribe =
+      onSnapshot(
+
+        collection(db, "users"),
+
+        (snapshot) => {
+
+          const usersData: any[] =
+            [];
+
+          snapshot.forEach((doc) => {
+
+            usersData.push({
+
+              id: doc.id,
+
+              ...doc.data(),
+
+            });
+
+          });
+
+          setUsers(
+            usersData
+          );
+
+        }
+
+      );
+
+    return () => unsubscribe();
+
+  }, []);
+
+  // FETCH LOGIN ACTIVITY
+
+  useEffect(() => {
+
+    const unsubscribe =
+      onSnapshot(
+
+        collection(db, "logins"),
+
+        (snapshot) => {
+
+          const loginData: any[] =
+            [];
+
+          snapshot.forEach((doc) => {
+
+            loginData.push({
+
+              id: doc.id,
+
+              ...doc.data(),
+
+            });
+
+          });
+
+          setLogins(
+            loginData
+          );
+
+        }
+
+      );
+
+    return () => unsubscribe();
+
+  }, []);
+
+  // FETCH SUPPORT TICKETS
+
+useEffect(() => {
+
+  const unsubscribe =
+    onSnapshot(
+
+      collection(
+        db,
+        "supportTickets"
+      ),
+
+      (snapshot) => {
+
+        const ticketData: any[] =
+          [];
+
+        snapshot.forEach((doc) => {
+
+          ticketData.push({
+
+            id: doc.id,
+
+            ...doc.data(),
+
+          });
+
+        });
+
+        setTickets(
+          ticketData
+        );
+
+      }
+
+    );
+
+  return () => unsubscribe();
+
+}, []);
+
+  if (!authorized) {
+
+    return (
+
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+
+        <h1 className="text-4xl font-bold">
+
+          Checking Admin Access...
+
+        </h1>
+
+      </div>
+
+    );
+
+  }
+
+  // STATS
+
+  const totalRevenue =
+    bookings.reduce(
+
+      (acc, item) => {
+
+        if (
+          item.plan === "Yearly"
+        ) {
+
+          return acc + 30000;
+
+        }
+
+        return (
+  acc +
+  Number(
+    item.amount || 0
+  )
+);
+
+      },
+
+      0
+
+    );
+
+  const availableCount =
+    parkings.filter(
+
+      (item) =>
+        item.availability ===
+        "Available"
+
+    ).length;
+
+  const occupiedCount =
+    parkings.filter(
+
+      (item) =>
+        item.availability ===
+        "Occupied"
+
+    ).length;
+
+  const pendingCount =
+    parkings.filter(
+
+      (item) =>
+        item.status ===
+        "Pending"
+
+    ).length;
+
+  const approvedCount =
+    parkings.filter(
+
+      (item) =>
+        item.status ===
+        "Approved"
+
+    ).length;
+
+  const featuredCount =
+    parkings.filter(
+      (item) =>
+        item.featured === true
+    ).length;
+
+  const onlineUsers =
+    logins.filter(
+      (item) =>
+        item.online === true
+    ).length;
+
+    const openTickets =
+  tickets.filter(
+    (ticket) =>
+      (ticket.status || "Open") ===
+      "Open"
+  ).length;
+
+const progressTickets =
+  tickets.filter(
+    (ticket) =>
+      ticket.status ===
+      "In Progress"
+  ).length;
+
+const waitingTickets =
+  tickets.filter(
+    (ticket) =>
+      ticket.status ===
+      "Waiting For Customer"
+  ).length;
+
+const resolvedTickets =
+  tickets.filter(
+    (ticket) =>
+      ticket.status ===
+      "Resolved"
+  ).length;
+
+  // CHART DATA
+
+  const chartData = [
+
+    {
+      name: "Listings",
+      value: parkings.length,
+    },
+
+    {
+      name: "Bookings",
+      value: bookings.length,
+    },
+
+    {
+      name: "Users",
+      value: users.length,
+    },
+
+    {
+      name: "Revenue",
+      value: totalRevenue,
+    },
+
+  ];
+
+  const pieData = [
+
+    {
+      name: "Available",
+      value: availableCount,
+    },
+
+    {
+      name: "Occupied",
+      value: occupiedCount,
+    },
+
+  ];
+
+return (
+
+  <div className="min-h-screen bg-gray-100 flex">
+
+    {/* SIDEBAR */}
+
+<div className="w-72 bg-black text-white min-h-screen p-6 sticky top-0">
+
+  <h2 className="text-3xl font-bold mb-8">
+    Admin Panel
+  </h2>
+
+  <div className="flex flex-col gap-3">
+
+    <button
+      onClick={() =>
+        setActiveSection("dashboard")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "dashboard"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Dashboard
+    </button>
+
+    <button
+      onClick={() =>
+        setActiveSection("listings")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "listings"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Parking Listings
+    </button>
+
+    <button
+      onClick={() =>
+        setActiveSection("users")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "users"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Users
+    </button>
+
+    <button
+      onClick={() =>
+        setActiveSection("bookings")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "bookings"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Bookings
+    </button>
+
+    <button
+      onClick={() =>
+        setActiveSection("tickets")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "tickets"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Support Tickets
+    </button>
+
+  </div>
+
+</div>
+
+<div className="flex-1">
+
+      {/* NOTIFICATION */}
+
+      {notification && (
+
+        <div className="fixed top-5 right-5 bg-green-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 font-bold">
+
+          {notification}
+
+        </div>
+
+      )}
+
+      {/* HEADER */}
+
+      <div className="bg-black text-white px-8 py-6 shadow-xl">
+
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+
+          <div>
+
+            <h1 className="text-5xl font-bold">
+
+              Admin Dashboard
+
+            </h1>
+
+            <p className="text-gray-400 mt-2">
+
+              Manage platform, users, listings and analytics
+
+            </p>
+
+          </div>
+
+          <div className="bg-green-500 px-6 py-3 rounded-2xl font-bold text-lg">
+
+            CarParking Bangalore
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div className="max-w-7xl mx-auto p-6">
+{activeSection === "dashboard" && (
+<>
+
+        {/* STATS */}
+
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-6 mb-10">
+
+          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-8 rounded-3xl shadow-xl">
+
+            <p className="text-lg mb-3">
+
+              Listings
+
+            </p>
+
+            <h2 className="text-5xl font-bold">
+
+              {parkings.length}
+
+            </h2>
+
+          </div>
+
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-8 rounded-3xl shadow-xl">
+
+            <p className="text-lg mb-3">
+
+              Pending
+
+            </p>
+
+            <h2 className="text-5xl font-bold">
+
+              {pendingCount}
+
+            </h2>
+
+          </div>
+
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-8 rounded-3xl shadow-xl">
+
+            <p className="text-lg mb-3">
+
+              Approved
+
+            </p>
+
+            <h2 className="text-5xl font-bold">
+
+              {approvedCount}
+
+            </h2>
+
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-8 rounded-3xl shadow-xl">
+
+            <p className="text-lg mb-3">
+
+              Featured
+
+            </p>
+
+            <h2 className="text-5xl font-bold">
+
+              {featuredCount}
+
+            </h2>
+
+          </div>
+
+          <div className="bg-gradient-to-r from-pink-500 to-pink-600 text-white p-8 rounded-3xl shadow-xl">
+
+            <p className="text-lg mb-3">
+
+              Users
+
+            </p>
+
+            <h2 className="text-5xl font-bold">
+
+              {users.length}
+
+            </h2>
+
+          </div>
+
+          <div className="bg-gradient-to-r from-black to-gray-800 text-white p-8 rounded-3xl shadow-xl">
+
+  <p className="text-lg mb-3">
+    Revenue
+  </p>
+
+  <h2 className="text-5xl font-bold">
+    ₹{totalRevenue}
+  </h2>
+
+</div>
+
+<div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-8 rounded-3xl shadow-xl">
+
+  <p className="text-lg mb-3">

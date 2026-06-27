@@ -9,6 +9,7 @@ import {
   doc,
   updateDoc,
   addDoc,
+  getDoc,
 } from "firebase/firestore";
 
 import {
@@ -61,8 +62,44 @@ export default function AdminPage() {
     const [tickets, setTickets] =
   useState<any[]>([]);
 
+  const [activeSection, setActiveSection] =
+  useState("dashboard");
+
 const [remarks, setRemarks] =
   useState<{ [key: string]: string }>({});
+
+  const [ticketCategoryFilter,
+  setTicketCategoryFilter] =
+  useState("All");
+
+  const [ticketSearch, setTicketSearch] =
+  useState("");
+
+const [ticketPage, setTicketPage] =
+  useState(1);
+
+const ticketsPerPage = 5;
+
+const [userSearch, setUserSearch] =
+  useState("");
+
+const [userPage, setUserPage] =
+  useState(1);
+
+const usersPerPage = 10;
+
+const [bookingSearch, setBookingSearch] =
+  useState("");
+
+const [bookingPage, setBookingPage] =
+  useState(1);
+
+const bookingsPerPage = 5;
+
+const [listingPage, setListingPage] =
+  useState(1);
+
+const listingsPerPage = 6;
 
   const router = useRouter();
 
@@ -77,7 +114,7 @@ const [remarks, setRemarks] =
 
         auth,
 
-        (currentUser) => {
+        async (currentUser) => {
 
           if (!currentUser) {
 
@@ -87,22 +124,34 @@ const [remarks, setRemarks] =
 
           }
 
-          if (
-            currentUser.email ===
-            "akhilnaidu19@gmail.com"
-          ) {
+          const userDoc =
+  await getDoc(
+    doc(
+      db,
+      "users",
+      currentUser.uid
+    )
+  );
 
-            setAuthorized(true);
+const userData =
+  userDoc.data();
 
-          } else {
+if (
+  userData?.role ===
+  "admin"
+) {
 
-            alert(
-              "Access Denied"
-            );
+  setAuthorized(true);
 
-            router.push("/");
+} else {
 
-          }
+  alert(
+    "Access Denied"
+  );
+
+  router.push("/");
+
+}
 
         }
 
@@ -437,6 +486,236 @@ const resolvedTickets =
       "Resolved"
   ).length;
 
+  const filteredTickets = tickets.filter(
+  (ticket) => {
+
+
+    const categoryMatch =
+      ticketCategoryFilter === "All"
+        ? true
+        : ticket.category ===
+          ticketCategoryFilter;
+
+    const searchMatch =
+      (
+        ticket.ticketId || ""
+      )
+        .toLowerCase()
+        .includes(
+          ticketSearch.toLowerCase()
+        ) ||
+
+      (
+        ticket.userName || ""
+      )
+        .toLowerCase()
+        .includes(
+          ticketSearch.toLowerCase()
+        ) ||
+
+      (
+        ticket.userEmail || ""
+      )
+        .toLowerCase()
+        .includes(
+          ticketSearch.toLowerCase()
+        ) ||
+
+      (
+        ticket.subject || ""
+      )
+        .toLowerCase()
+        .includes(
+          ticketSearch.toLowerCase()
+        );
+
+    return (
+      categoryMatch &&
+      searchMatch
+    );
+  }
+
+  
+);
+
+const filteredUsers = users.filter(
+  (user) => {
+
+    return (
+
+      (user.name || "")
+        .toLowerCase()
+        .includes(
+          userSearch.toLowerCase()
+        ) ||
+
+      (user.email || "")
+        .toLowerCase()
+        .includes(
+          userSearch.toLowerCase()
+        ) ||
+
+      (user.phone || "")
+        .toLowerCase()
+        .includes(
+          userSearch.toLowerCase()
+        ) ||
+
+      (user.city || "")
+        .toLowerCase()
+        .includes(
+          userSearch.toLowerCase()
+        )
+
+    );
+
+  }
+);
+
+const totalUserPages =
+  Math.ceil(
+    filteredUsers.length /
+      usersPerPage
+  );
+
+const paginatedUsers =
+  filteredUsers.slice(
+    (userPage - 1) *
+      usersPerPage,
+
+    userPage *
+      usersPerPage
+  );
+
+  const filteredBookings =
+  bookings.filter((booking) => {
+
+    return (
+
+      (booking.name || "")
+        .toLowerCase()
+        .includes(
+          bookingSearch.toLowerCase()
+        ) ||
+
+      (booking.email || "")
+        .toLowerCase()
+        .includes(
+          bookingSearch.toLowerCase()
+        ) ||
+
+      (booking.title || "")
+        .toLowerCase()
+        .includes(
+          bookingSearch.toLowerCase()
+        ) ||
+
+      (booking.location || "")
+        .toLowerCase()
+        .includes(
+          bookingSearch.toLowerCase()
+        )
+
+    );
+
+  });
+
+const totalBookingPages =
+  Math.ceil(
+    filteredBookings.length /
+      bookingsPerPage
+  );
+
+const paginatedBookings =
+  filteredBookings.slice(
+    (bookingPage - 1) *
+      bookingsPerPage,
+
+    bookingPage *
+      bookingsPerPage
+  );
+
+  const filteredListings =
+  parkings.filter((parking) => {
+
+    const matchesSearch =
+
+      (parking.title || "")
+        .toLowerCase()
+        .includes(
+          search.toLowerCase()
+        ) ||
+
+      (parking.location || "")
+        .toLowerCase()
+        .includes(
+          search.toLowerCase()
+        ) ||
+
+      (parking.ownerName || "")
+        .toLowerCase()
+        .includes(
+          search.toLowerCase()
+        );
+
+    const matchesFilter =
+
+      filter === "All"
+
+        ? true
+
+        : filter === "Pending"
+
+        ? parking.status ===
+          "Pending"
+
+        : filter === "Approved"
+
+        ? parking.status ===
+          "Approved"
+
+        : parking.availability ===
+          filter;
+
+    return (
+      matchesSearch &&
+      matchesFilter
+    );
+
+  });
+
+const totalListingPages =
+  Math.ceil(
+    filteredListings.length /
+      listingsPerPage
+  );
+
+const paginatedListings =
+  filteredListings.slice(
+    (listingPage - 1) *
+      listingsPerPage,
+
+    listingPage *
+      listingsPerPage
+  );
+
+
+
+const totalTicketPages =
+  Math.ceil(
+    filteredTickets.length /
+      ticketsPerPage
+  );
+
+const paginatedTickets =
+  filteredTickets.slice(
+    (ticketPage - 1) *
+      ticketsPerPage,
+
+    ticketPage *
+      ticketsPerPage
+  );
+
   // CHART DATA
 
   const chartData = [
@@ -477,9 +756,90 @@ const resolvedTickets =
 
   ];
 
-  return (
+return (
 
-    <div className="min-h-screen bg-gray-100">
+  <div className="min-h-screen bg-gray-100 flex">
+
+    {/* SIDEBAR */}
+
+<div className="w-72 bg-black text-white min-h-screen p-6 sticky top-0">
+
+  <h2 className="text-3xl font-bold mb-8">
+    Admin Panel
+  </h2>
+
+  <div className="flex flex-col gap-3">
+
+    <button
+      onClick={() =>
+        setActiveSection("dashboard")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "dashboard"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Dashboard
+    </button>
+
+    <button
+      onClick={() =>
+        setActiveSection("listings")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "listings"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Parking Listings
+    </button>
+
+    <button
+      onClick={() =>
+        setActiveSection("users")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "users"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Users
+    </button>
+
+    <button
+      onClick={() =>
+        setActiveSection("bookings")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "bookings"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Bookings
+    </button>
+
+    <button
+      onClick={() =>
+        setActiveSection("tickets")
+      }
+      className={`p-4 rounded-xl text-left ${
+        activeSection === "tickets"
+          ? "bg-green-500"
+          : "bg-gray-800"
+      }`}
+    >
+      Support Tickets
+    </button>
+
+  </div>
+
+</div>
+
+<div className="flex-1">
 
       {/* NOTIFICATION */}
 
@@ -526,6 +886,8 @@ const resolvedTickets =
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
+{activeSection === "dashboard" && (
+<>
 
         {/* STATS */}
 
@@ -954,7 +1316,11 @@ const resolvedTickets =
 </div>
 
 </div>
+</>
+)}
 
+{activeSection === "listings" && (
+<>
         {/* SEARCH */}
 
         <div className="bg-white rounded-3xl shadow-xl p-6 mb-10 flex flex-col md:flex-row gap-4">
@@ -973,11 +1339,15 @@ const resolvedTickets =
 
           <select
             value={filter}
-            onChange={(e) =>
-              setFilter(
-                e.target.value
-              )
-            }
+            onChange={(e) => {
+
+  setFilter(
+    e.target.value
+  );
+
+  setListingPage(1);
+
+}}
             className="border p-4 rounded-2xl"
           >
 
@@ -1017,46 +1387,8 @@ const resolvedTickets =
 
           <div className="grid gap-8">
 
-            {parkings
-
-              .filter((parking) => {
-
-                const matchesSearch =
-                  parking.title
-                    ?.toLowerCase()
-                    .includes(
-                      search.toLowerCase()
-                    );
-
-                const matchesFilter =
-
-                  filter === "All"
-
-                    ? true
-
-                    : filter ===
-                      "Pending"
-
-                    ? parking.status ===
-                      "Pending"
-
-                    : filter ===
-                      "Approved"
-
-                    ? parking.status ===
-                      "Approved"
-
-                    : parking.availability ===
-                      filter;
-
-                return (
-                  matchesSearch &&
-                  matchesFilter
-                );
-
-              })
-
-              .map((parking) => (
+            {paginatedListings.map(
+  (parking) => (
 
                 <div
                   key={parking.id}
@@ -1392,12 +1724,66 @@ const resolvedTickets =
 
               ))}
 
-          </div>
+</div>
 
-        </div>
-        </div>
+<div className="flex justify-center items-center gap-4 mt-8">
 
-        {/* USERS MANAGEMENT */}
+  <button
+    disabled={listingPage === 1}
+    onClick={() =>
+      setListingPage(
+        listingPage - 1
+      )
+    }
+    className="bg-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+  >
+    Previous
+  </button>
+
+  <span className="font-bold">
+    Showing {
+      (listingPage - 1) *
+        listingsPerPage +
+      1
+    }
+    -
+    {Math.min(
+      listingPage *
+        listingsPerPage,
+      filteredListings.length
+    )}{" "}
+    of {filteredListings.length}
+  </span>
+
+  <button
+    disabled={
+      listingPage >=
+      totalListingPages
+    }
+    onClick={() =>
+      setListingPage(
+        listingPage + 1
+      )
+    }
+    className="bg-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+  >
+    Next
+  </button>
+
+</div>
+
+
+
+</div>
+
+</>
+
+)}
+
+        {activeSection === "users" && (
+<>
+
+{/* USERS MANAGEMENT */}
 
         
 
@@ -1405,11 +1791,31 @@ const resolvedTickets =
 
   <div className="flex items-center justify-between mb-8">
 
-    <h2 className="text-4xl font-bold">
+<div className="flex items-center gap-4">
 
-      User Management
+  <h2 className="text-4xl font-bold">
 
-    </h2>
+    User Management
+
+  </h2>
+
+  <input
+    type="text"
+    placeholder="Search Name, Email, Phone, City"
+    value={userSearch}
+    onChange={(e) => {
+
+      setUserSearch(
+        e.target.value
+      );
+
+      setUserPage(1);
+
+    }}
+    className="border p-2 rounded-xl w-96"
+  />
+
+</div>
 
     <div className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold">
 
@@ -1421,7 +1827,7 @@ const resolvedTickets =
 
   <div className="grid gap-6">
 
-    {users.map((user) => (
+    {paginatedUsers.map((user) => (
 
       <div
         key={user.id}
@@ -1568,17 +1974,87 @@ const resolvedTickets =
 
   </div>
 
+<div className="flex justify-center items-center gap-4 mt-8">
+
+  <button
+    disabled={userPage === 1}
+    onClick={() =>
+      setUserPage(userPage - 1)
+    }
+    className="bg-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+  >
+    Previous
+  </button>
+
+  <span className="font-bold">
+    Showing {
+      (userPage - 1) *
+        usersPerPage +
+      1
+    }
+    -
+    {Math.min(
+      userPage *
+        usersPerPage,
+      filteredUsers.length
+    )}{" "}
+    of {filteredUsers.length}
+  </span>
+
+  <button
+    disabled={
+      userPage >= totalUserPages
+    }
+    onClick={() =>
+      setUserPage(userPage + 1)
+    }
+    className="bg-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+  >
+    Next
+  </button>
+
+</div>
+
+</div>
+
+</>
+)}
+
+
+{activeSection === "bookings" && (
+<>
+
 {/* BOOKINGS MANAGEMENT */}
 
 <div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
 
   <div className="flex items-center justify-between mb-8">
 
-    <h2 className="text-4xl font-bold">
+<div className="flex items-center gap-4">
 
-      Booking Management
+  <h2 className="text-4xl font-bold">
 
-    </h2>
+    Booking Management
+
+  </h2>
+
+  <input
+    type="text"
+    placeholder="Search Booking..."
+    value={bookingSearch}
+    onChange={(e) => {
+
+      setBookingSearch(
+        e.target.value
+      );
+
+      setBookingPage(1);
+
+    }}
+    className="border p-2 rounded-xl w-96"
+  />
+
+</div>
 
     <div className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold">
 
@@ -1590,7 +2066,7 @@ const resolvedTickets =
 
   <div className="grid gap-6">
 
-    {bookings.map((booking) => (
+    {paginatedBookings.map((booking) => (
 
       <div
         key={booking.id}
@@ -1739,19 +2215,109 @@ const resolvedTickets =
 
     ))}
 
-    </div>
+</div>
 
-    {/* SUPPORT TICKETS */}
+<div className="flex justify-center items-center gap-4 mt-8">
+
+  <button
+    disabled={bookingPage === 1}
+    onClick={() =>
+      setBookingPage(
+        bookingPage - 1
+      )
+    }
+    className="bg-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+  >
+    Previous
+  </button>
+
+  <span className="font-bold">
+    Showing {
+      (bookingPage - 1) *
+        bookingsPerPage +
+      1
+    }
+    -
+    {Math.min(
+      bookingPage *
+        bookingsPerPage,
+      filteredBookings.length
+    )}{" "}
+    of {filteredBookings.length}
+  </span>
+
+  <button
+    disabled={
+      bookingPage >=
+      totalBookingPages
+    }
+    onClick={() =>
+      setBookingPage(
+        bookingPage + 1
+      )
+    }
+    className="bg-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+  >
+    Next
+  </button>
+
+</div>
+
+</div>
+
+</>
+)}
+
+{activeSection === "tickets" && (
+<>
+
+{/* SUPPORT TICKETS */}
 
 <div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
 
   <div className="flex items-center justify-between mb-8">
 
-    <h2 className="text-4xl font-bold">
+<div className="flex items-center gap-4">
 
-      Support Tickets
+  <h2 className="text-4xl font-bold">
+    Support Tickets
+  </h2>
 
-    </h2>
+  <select
+    value={ticketCategoryFilter}
+    onChange={(e) =>
+      setTicketCategoryFilter(
+        e.target.value
+      )
+    }
+    className="border p-2 rounded-xl"
+  >
+
+    <option>All</option>
+    <option>Booking Issue</option>
+    <option>Payment Issue</option>
+    <option>Refund Request</option>
+    <option>Login Issue</option>
+    <option>Listing Issue</option>
+    <option>Complaint</option>
+    <option>Technical Issue</option>
+
+  </select>
+
+  <input
+  type="text"
+  placeholder="Search Ticket ID, User, Email..."
+  value={ticketSearch}
+  onChange={(e) => {
+    setTicketSearch(
+      e.target.value
+    );
+    setTicketPage(1);
+  }}
+  className="border p-2 rounded-xl w-80"
+/>
+
+</div>
 
     <div className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold">
 
@@ -1763,7 +2329,7 @@ const resolvedTickets =
 
   <div className="grid gap-6">
 
-    {tickets.map((ticket) => (
+  {paginatedTickets.map((ticket) => (
 
       <div
 
@@ -1800,6 +2366,24 @@ const resolvedTickets =
   Priority :
   {ticket.priority}
 </p>
+
+<div className="mt-2">
+
+  <span
+    className="
+      bg-blue-100
+      text-blue-700
+      px-3
+      py-1
+      rounded-full
+      text-sm
+      font-bold
+    "
+  >
+    {ticket.category || "General"}
+  </span>
+
+</div>
 
             <p className="mt-4">
 
@@ -1970,13 +2554,57 @@ const resolvedTickets =
 
   </div>
 
+<div className="flex justify-center items-center gap-4 mt-8">
+
+  <button
+    disabled={ticketPage === 1}
+    onClick={() =>
+      setTicketPage(ticketPage - 1)
+    }
+    className="bg-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+  >
+    Previous
+  </button>
+
+<span className="font-bold">
+  Showing {
+    (ticketPage - 1) *
+      ticketsPerPage +
+    1
+  }
+  -
+  {Math.min(
+    ticketPage *
+      ticketsPerPage,
+    filteredTickets.length
+  )}{" "}
+  of {filteredTickets.length}
+</span>
+
+  <button
+    disabled={
+      ticketPage >= totalTicketPages
+    }
+    onClick={() =>
+      setTicketPage(ticketPage + 1)
+    }
+    className="bg-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+  >
+    Next
+  </button>
+
 </div>
 
 </div>
+
+</>
+)}
 
       </div>
 
     </div>
+
+  </div>
 
   );
 

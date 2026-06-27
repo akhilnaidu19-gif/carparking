@@ -192,12 +192,9 @@ if (
               // ADMIN CHECK
 
               if (
-
-                user.email ===
-
-                "admin@gmail.com"
-
-              ) {
+  userData?.role ===
+  "admin"
+){
 
                 localStorage.setItem(
 
@@ -265,22 +262,26 @@ if (
               // REDIRECT
 
               if (
+  userData?.role ===
+  "admin"
+) {
 
-                user.email ===
+  localStorage.setItem(
+    "isAdmin",
+    "true"
+  );
 
-                "admin@gmail.com"
+  router.push("/admin");
 
-              ) {
+} else {
 
-                router.push(
-                  "/admin"
-                );
+  localStorage.removeItem(
+    "isAdmin"
+  );
 
-              } else {
+  router.push("/");
 
-                router.push("/");
-
-              }
+}
 
             } catch (error: any) {
 
@@ -368,15 +369,30 @@ if (
 
         {/* EXTRA */}
 
-        <div className="mt-8 text-center">
+<div className="mt-8 text-center">
 
-          <p className="text-gray-500">
+  <p className="text-gray-500 mb-4">
 
-            Secure Login Powered By Firebase
+    Secure Login Powered By Firebase
 
-          </p>
+  </p>
 
-        </div>
+  <p className="text-gray-600">
+
+    Don't have an account?{" "}
+
+    <button
+      onClick={() =>
+        router.push("/signup")
+      }
+      className="text-green-600 font-bold hover:underline"
+    >
+      Sign Up Here
+    </button>
+
+  </p>
+
+</div>
 
       </div>
 

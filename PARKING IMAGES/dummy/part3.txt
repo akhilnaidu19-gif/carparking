@@ -1,0 +1,718 @@
+                           : "Make Featured"}
+
+                        </button>
+
+                        {/* DELETE */}
+
+                        <button
+
+                          onClick={async () => {
+
+                            const confirmDelete =
+                              confirm(
+                                "Delete Listing?"
+                              );
+
+                            if (
+                              !confirmDelete
+                            )
+                              return;
+
+                            await deleteDoc(
+                              doc(
+                                db,
+                                "parkings",
+                                parking.id
+                              )
+                            );
+
+                            alert(
+                              "Listing Deleted"
+                            );
+
+                          }}
+
+                          className="bg-red-500 text-white px-6 py-4 rounded-2xl font-bold"
+
+                        >
+
+                          Delete
+
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              ))}
+
+          </div>
+
+        </div>
+
+
+
+</>
+)}
+
+        {activeSection === "users" && (
+<>
+
+{/* USERS MANAGEMENT */}
+
+        
+
+<div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
+
+  <div className="flex items-center justify-between mb-8">
+
+    <h2 className="text-4xl font-bold">
+
+      User Management
+
+    </h2>
+
+    <div className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold">
+
+      {users.length} Users
+
+    </div>
+
+  </div>
+
+  <div className="grid gap-6">
+
+    {users.map((user) => (
+
+      <div
+        key={user.id}
+        className="bg-gray-50 border rounded-3xl p-6 flex flex-col md:flex-row justify-between gap-6"
+      >
+
+        <div className="flex items-center gap-5">
+
+          <img
+            src={
+              user.photoURL ||
+              "https://ui-avatars.com/api/?name=User"
+            }
+            className="w-20 h-20 rounded-full object-cover"
+          />
+
+          <div>
+
+            <h3 className="text-2xl font-bold">
+
+              {user.name || "No Name"}
+
+            </h3>
+
+            <p className="text-gray-600">
+
+              {user.email}
+
+            </p>
+
+            <p className="text-gray-500">
+
+              {user.phone || "No Phone"}
+
+            </p>
+
+            <p className="text-gray-500">
+
+              {user.city || "No City"}
+
+            </p>
+
+          </div>
+
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+
+          <span
+            className={`px-5 py-3 rounded-2xl text-white font-bold ${
+              user.status === "Blocked"
+                ? "bg-red-500"
+                : "bg-green-500"
+            }`}
+          >
+
+            {user.status || "Active"}
+
+          </span>
+
+          <button
+
+            onClick={async () => {
+
+              await updateDoc(
+
+                doc(
+                  db,
+                  "users",
+                  user.id
+                ),
+
+                {
+                  status:
+                    user.status ===
+                    "Blocked"
+                      ? "Active"
+                      : "Blocked",
+                }
+
+              );
+
+            }}
+
+            className={`px-6 py-3 rounded-2xl font-bold text-white ${
+              user.status ===
+              "Blocked"
+                ? "bg-green-500"
+                : "bg-orange-500"
+            }`}
+
+          >
+
+            {user.status ===
+            "Blocked"
+
+              ? "Activate User"
+
+              : "Block User"}
+
+          </button>
+
+          <button
+
+            onClick={async () => {
+
+              const confirmDelete =
+                confirm(
+                  "Delete User Profile?"
+                );
+
+              if (!confirmDelete)
+                return;
+
+              await deleteDoc(
+
+                doc(
+                  db,
+                  "users",
+                  user.id
+                )
+
+              );
+
+              alert(
+                "User Deleted"
+              );
+
+            }}
+
+            className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold"
+
+          >
+
+            Delete User
+
+          </button>
+
+        </div>
+
+      </div>
+
+    ))}
+
+  </div>
+</div>
+
+</>
+)}
+
+
+{activeSection === "bookings" && (
+<>
+
+{/* BOOKINGS MANAGEMENT */}
+
+<div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
+
+  <div className="flex items-center justify-between mb-8">
+
+    <h2 className="text-4xl font-bold">
+
+      Booking Management
+
+    </h2>
+
+    <div className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold">
+
+      {bookings.length} Bookings
+
+    </div>
+
+  </div>
+
+  <div className="grid gap-6">
+
+    {bookings.map((booking) => (
+
+      <div
+        key={booking.id}
+        className="bg-gray-50 border rounded-3xl p-6"
+      >
+
+        <div className="grid md:grid-cols-4 gap-6">
+
+          <div>
+
+            <p className="text-gray-500">
+              Customer
+            </p>
+
+            <h3 className="font-bold text-xl">
+              {booking.name}
+            </h3>
+
+            <p>
+              {booking.email}
+            </p>
+
+          </div>
+
+          <div>
+
+            <p className="text-gray-500">
+              Parking
+            </p>
+
+            <h3 className="font-bold">
+              {booking.title}
+            </h3>
+
+            <p>
+              {booking.location}
+            </p>
+
+          </div>
+
+          <div>
+
+            <p className="text-gray-500">
+              Plan
+            </p>
+
+            <h3 className="font-bold">
+              {booking.plan}
+            </h3>
+
+            <p>
+              Valid Till:
+              {booking.validTill}
+            </p>
+
+          </div>
+
+          <div>
+
+            <p className="text-gray-500">
+              Payment
+            </p>
+
+            <h3 className="font-bold text-green-600">
+              {booking.paymentStatus}
+            </h3>
+
+            <p>
+              {booking.bookingDate}
+            </p>
+
+          </div>
+
+        </div>
+
+        <div className="mt-6">
+
+          <button
+
+            onClick={async () => {
+
+              const confirmDelete =
+                confirm(
+                  "Cancel this booking?"
+                );
+
+              if (!confirmDelete)
+                return;
+
+              try {
+
+                if (
+                  booking.parkingId
+                ) {
+
+                  await updateDoc(
+
+                    doc(
+                      db,
+                      "parkings",
+                      booking.parkingId
+                    ),
+
+                    {
+                      availability:
+                        "Available",
+                    }
+
+                  );
+
+                }
+
+                await deleteDoc(
+
+                  doc(
+                    db,
+                    "bookings",
+                    booking.id
+                  )
+
+                );
+
+                alert(
+                  "Booking Cancelled"
+                );
+
+              } catch (error) {
+
+                console.log(error);
+
+              }
+
+            }}
+
+            className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold"
+
+          >
+
+            Cancel Booking
+
+          </button>
+
+        </div>
+
+      </div>
+
+    ))}
+
+  </div>
+
+</div>
+
+</>
+)}
+
+{activeSection === "tickets" && (
+<>
+
+{/* SUPPORT TICKETS */}
+
+<div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
+
+  <div className="flex items-center justify-between mb-8">
+
+<div className="flex items-center gap-4">
+
+  <h2 className="text-4xl font-bold">
+    Support Tickets
+  </h2>
+
+  <select
+    value={ticketCategoryFilter}
+    onChange={(e) =>
+      setTicketCategoryFilter(
+        e.target.value
+      )
+    }
+    className="border p-2 rounded-xl"
+  >
+
+    <option>All</option>
+    <option>Booking Issue</option>
+    <option>Payment Issue</option>
+    <option>Refund Request</option>
+    <option>Login Issue</option>
+    <option>Listing Issue</option>
+    <option>Complaint</option>
+    <option>Technical Issue</option>
+
+  </select>
+
+</div>
+
+    <div className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold">
+
+      {tickets.length} Tickets
+
+    </div>
+
+  </div>
+
+  <div className="grid gap-6">
+
+  {tickets
+  .filter((ticket) =>
+
+    ticketCategoryFilter ===
+    "All"
+
+      ? true
+
+      : ticket.category ===
+        ticketCategoryFilter
+
+  )
+  .map((ticket) => (
+
+      <div
+
+        key={ticket.id}
+
+        className="bg-gray-50 border rounded-3xl p-6"
+
+      >
+
+        <div className="flex justify-between items-start">
+
+          <div>
+
+            <h3 className="text-2xl font-bold">
+  {ticket.subject}
+</h3>
+
+<p className="text-gray-500">
+  Ticket ID :
+  {ticket.ticketId}
+</p>
+
+<p className="text-gray-500">
+  User :
+  {ticket.userName}
+</p>
+
+<p className="text-gray-500">
+  Email :
+  {ticket.userEmail}
+</p>
+
+<p className="text-gray-500">
+  Priority :
+  {ticket.priority}
+</p>
+
+<div className="mt-2">
+
+  <span
+    className="
+      bg-blue-100
+      text-blue-700
+      px-3
+      py-1
+      rounded-full
+      text-sm
+      font-bold
+    "
+  >
+    {ticket.category || "General"}
+  </span>
+
+</div>
+
+            <p className="mt-4">
+
+              {ticket.message}
+
+            </p>
+
+            <div className="mt-5">
+
+  <h4 className="font-bold mb-2">
+    Admin Remarks
+  </h4>
+
+  <textarea
+    value={
+      remarks[ticket.id] ??
+      ticket.adminRemarks ??
+      ""
+    }
+    onChange={(e) =>
+      setRemarks({
+        ...remarks,
+        [ticket.id]:
+          e.target.value,
+      })
+    }
+    className="w-full border p-3 rounded-xl h-24"
+  />
+
+</div>
+
+          </div>
+
+          <select
+  value={ticket.status || "Open"}
+  onChange={async (e) => {
+
+    await updateDoc(
+      doc(
+        db,
+        "supportTickets",
+        ticket.id
+      ),
+      {
+        status:
+          e.target.value,
+      }
+    );
+
+  }}
+  className="border p-3 rounded-xl"
+>
+
+  <option>
+    Open
+  </option>
+
+  <option>
+    In Progress
+  </option>
+
+  <option>
+    Waiting For Customer
+  </option>
+
+  <option>
+    Resolved
+  </option>
+
+</select>
+
+        </div>
+
+       <div className="flex flex-wrap gap-4 mt-6">
+
+          <button
+
+            onClick={async () => {
+
+              await updateDoc(
+
+                doc(
+                  db,
+                  "supportTickets",
+                  ticket.id
+                ),
+
+                {
+                  status:
+                    "Resolved",
+                }
+
+              );
+
+            }}
+
+            className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold"
+
+          >
+
+            Mark Resolved
+
+          </button>
+
+<button
+
+  onClick={async () => {
+
+    await updateDoc(
+
+      doc(
+        db,
+        "supportTickets",
+        ticket.id
+      ),
+
+      {
+        adminRemarks:
+          remarks[ticket.id] ||
+          "",
+      }
+
+    );
+
+    alert(
+      "Remarks Updated"
+    );
+
+  }}
+
+  className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold"
+
+>
+
+  Save Remarks
+
+</button>
+
+          <button
+
+            onClick={async () => {
+
+              await deleteDoc(
+
+                doc(
+                  db,
+                  "supportTickets",
+                  ticket.id
+                )
+
+              );
+
+            }}
+
+            className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold"
+
+          >
+
+            Delete Ticket
+
+          </button>
+
+        </div>
+
+      </div>
+
+    ))}
+
+  </div>
+
+</div>
+
+</>
+)}
+
+      </div>
+
+    </div>
+
+  );
+
+}

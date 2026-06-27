@@ -11,10 +11,14 @@ import {
 import { db } from "@/lib/firebase";
 
 export default function SupportPage() {
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+const [subject, setSubject] = useState("");
+const [message, setMessage] = useState("");
+
+const [category, setCategory] =
+  useState("");
+
+const [tickets, setTickets] = useState<any[]>([]);
+const [loading, setLoading] = useState(false);
 
   const loadTickets = async () => {
     const email = localStorage.getItem("userEmail");
@@ -52,7 +56,11 @@ export default function SupportPage() {
       return;
     }
 
-    if (!subject || !message) {
+    if (
+  !subject ||
+  !message ||
+  !category
+) {
       alert("Please fill all fields");
       return;
     }
@@ -66,17 +74,36 @@ export default function SupportPage() {
           100000 + Math.random() * 900000
         );
 
-      await addDoc(
-        collection(db, "supportTickets"),
-        {
-          ticketId,
-          userName: name,
-          userEmail: email,
-          subject,
-          message,
+        let priority = "Medium";
+
+if (
+  category === "Payment Issue" ||
+  category === "Refund Request" ||
+  category === "Complaint"
+) {
+  priority = "High";
+}
+
+if (
+  category === "Technical Issue"
+) {
+  priority = "Low";
+}
+
+await addDoc(
+  collection(db, "supportTickets"),
+  {
+    ticketId,
+    userName: name,
+    userEmail: email,
+
+    category,
+
+    subject,
+    message,
 
           status: "Open",
-          priority: "Medium",
+          priority,
 
           adminRemarks: "",
 
@@ -89,8 +116,9 @@ export default function SupportPage() {
         `Ticket Created Successfully\nTicket ID: ${ticketId}`
       );
 
-      setSubject("");
-      setMessage("");
+setSubject("");
+setMessage("");
+setCategory("");
 
       loadTickets();
     } catch (error) {
@@ -142,6 +170,48 @@ export default function SupportPage() {
             }
             className="w-full border p-4 rounded-2xl mb-4"
           />
+
+          <select
+  value={category}
+  onChange={(e) =>
+    setCategory(e.target.value)
+  }
+  className="w-full border p-4 rounded-2xl mb-4"
+>
+
+  <option value="">
+    Select Category
+  </option>
+
+  <option value="Booking Issue">
+    Booking Issue
+  </option>
+
+  <option value="Payment Issue">
+    Payment Issue
+  </option>
+
+  <option value="Refund Request">
+    Refund Request
+  </option>
+
+  <option value="Login Issue">
+    Login Issue
+  </option>
+
+  <option value="Listing Issue">
+    Listing Issue
+  </option>
+
+  <option value="Complaint">
+    Complaint
+  </option>
+
+  <option value="Technical Issue">
+    Technical Issue
+  </option>
+
+</select>
 
           <textarea
             placeholder="Describe your issue"

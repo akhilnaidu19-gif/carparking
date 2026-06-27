@@ -1,0 +1,718 @@
+   Total Tickets
+  </p>
+
+  
+
+  <h2 className="text-5xl font-bold">
+    {tickets.length}
+  </h2>
+
+  
+
+</div>
+
+
+
+        </div>
+
+        {/* ANALYTICS */}
+
+        <div className="grid md:grid-cols-2 gap-8 mb-10">
+
+          <div className="bg-white rounded-3xl shadow-xl p-8">
+
+            <h2 className="text-3xl font-bold mb-8">
+
+              Platform Analytics
+
+            </h2>
+
+            <div className="h-[350px]">
+
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+
+                <BarChart
+                  data={chartData}
+                >
+
+                  <XAxis dataKey="name" />
+
+                  <YAxis />
+
+                  <Tooltip />
+
+                  <Bar dataKey="value" />
+
+                </BarChart>
+
+              </ResponsiveContainer>
+
+            </div>
+
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-xl p-8">
+
+            <h2 className="text-3xl font-bold mb-8">
+
+              Occupancy Analytics
+
+            </h2>
+
+            <div className="h-[350px]">
+
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+
+                <PieChart>
+
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    outerRadius={120}
+                    label
+                  >
+
+                    <Cell fill="#22c55e" />
+
+                    <Cell fill="#ef4444" />
+
+                  </Pie>
+
+                  <Tooltip />
+
+                </PieChart>
+
+              </ResponsiveContainer>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* SUPPORT ANALYTICS */}
+
+<div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
+
+  <div className="flex items-center justify-between mb-8">
+
+    <h2 className="text-4xl font-bold">
+      🎫 Support Analytics
+    </h2>
+
+    <div className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold">
+      {tickets.length} Tickets
+    </div>
+
+  </div>
+
+  <div className="grid md:grid-cols-4 gap-6">
+
+    <div className="bg-yellow-500 text-white p-6 rounded-3xl">
+
+      <p className="text-lg">
+        Open
+      </p>
+
+      <h2 className="text-5xl font-bold">
+        {openTickets}
+      </h2>
+
+    </div>
+
+    <div className="bg-blue-500 text-white p-6 rounded-3xl">
+
+      <p className="text-lg">
+        In Progress
+      </p>
+
+      <h2 className="text-5xl font-bold">
+        {progressTickets}
+      </h2>
+
+    </div>
+
+    <div className="bg-orange-500 text-white p-6 rounded-3xl">
+
+      <p className="text-lg">
+        Waiting
+      </p>
+
+      <h2 className="text-5xl font-bold">
+        {waitingTickets}
+      </h2>
+
+    </div>
+
+    <div className="bg-green-600 text-white p-6 rounded-3xl">
+
+      <p className="text-lg">
+        Resolved
+      </p>
+
+      <h2 className="text-5xl font-bold">
+        {resolvedTickets}
+      </h2>
+
+    </div>
+
+  </div>
+
+  <div className="mt-8 bg-gray-100 rounded-3xl p-6">
+
+    <h3 className="text-2xl font-bold mb-4">
+      Support Performance
+    </h3>
+
+    <div className="grid md:grid-cols-2 gap-6">
+
+      <div>
+
+        <p className="text-gray-500">
+          Total Tickets
+        </p>
+
+        <h2 className="text-4xl font-bold">
+          {tickets.length}
+        </h2>
+
+      </div>
+
+      <div>
+
+        <p className="text-gray-500">
+          Resolution Rate
+        </p>
+
+        <h2 className="text-4xl font-bold text-green-600">
+
+          {tickets.length > 0
+            ? Math.round(
+                (resolvedTickets /
+                  tickets.length) *
+                  100
+              )
+            : 0}
+
+          %
+
+        </h2>
+
+      </div>
+
+    </div>
+
+  </div>
+
+{/* RECENT TICKETS */}
+
+<div className="mt-10">
+
+  <h3 className="text-2xl font-bold mb-5">
+
+    Recent Support Tickets
+
+  </h3>
+
+  <div className="overflow-x-auto">
+
+    <table className="w-full">
+
+      <thead>
+
+        <tr className="bg-gray-100">
+
+          <th className="p-4 text-left">
+            Ticket ID
+          </th>
+
+          <th className="p-4 text-left">
+            User
+          </th>
+
+          <th className="p-4 text-left">
+            Subject
+          </th>
+
+          <th className="p-4 text-left">
+            Priority
+          </th>
+
+          <th className="p-4 text-left">
+            Status
+          </th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        {tickets
+
+          .slice(0, 5)
+
+          .map((ticket) => (
+
+            <tr
+              key={ticket.id}
+              className="border-b"
+            >
+
+              <td className="p-4 font-semibold">
+
+                {ticket.ticketId}
+
+              </td>
+
+              <td className="p-4">
+
+                {ticket.userName}
+
+              </td>
+
+              <td className="p-4">
+
+                {ticket.subject}
+
+              </td>
+
+              <td className="p-4">
+
+                {ticket.priority}
+
+              </td>
+
+              <td className="p-4">
+
+                <span
+                  className={`px-3 py-1 rounded-full text-white text-sm font-bold ${
+                    ticket.status ===
+                    "Resolved"
+                      ? "bg-green-500"
+                      : ticket.status ===
+                        "In Progress"
+                      ? "bg-blue-500"
+                      : ticket.status ===
+                        "Waiting For Customer"
+                      ? "bg-orange-500"
+                      : "bg-red-500"
+                  }`}
+                >
+
+                  {ticket.status ||
+                    "Open"}
+
+                </span>
+
+              </td>
+
+            </tr>
+
+          ))}
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+</div>
+
+</div>
+</>
+)}
+
+{activeSection === "listings" && (
+<>
+        {/* SEARCH */}
+
+        <div className="bg-white rounded-3xl shadow-xl p-6 mb-10 flex flex-col md:flex-row gap-4">
+
+          <input
+            type="text"
+            placeholder="Search Listings"
+            value={search}
+            onChange={(e) =>
+              setSearch(
+                e.target.value
+              )
+            }
+            className="border p-4 rounded-2xl flex-1"
+          />
+
+          <select
+            value={filter}
+            onChange={(e) =>
+              setFilter(
+                e.target.value
+              )
+            }
+            className="border p-4 rounded-2xl"
+          >
+
+            <option>
+              All
+            </option>
+
+            <option>
+              Available
+            </option>
+
+            <option>
+              Occupied
+            </option>
+
+            <option>
+              Pending
+            </option>
+
+            <option>
+              Approved
+            </option>
+
+          </select>
+
+        </div>
+
+        {/* LISTINGS */}
+
+        <div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
+
+          <h2 className="text-4xl font-bold mb-8">
+
+            Parking Listings
+
+          </h2>
+
+          <div className="grid gap-8">
+
+            {parkings
+
+              .filter((parking) => {
+
+                const matchesSearch =
+                  parking.title
+                    ?.toLowerCase()
+                    .includes(
+                      search.toLowerCase()
+                    );
+
+                const matchesFilter =
+
+                  filter === "All"
+
+                    ? true
+
+                    : filter ===
+                      "Pending"
+
+                    ? parking.status ===
+                      "Pending"
+
+                    : filter ===
+                      "Approved"
+
+                    ? parking.status ===
+                      "Approved"
+
+                    : parking.availability ===
+                      filter;
+
+                return (
+                  matchesSearch &&
+                  matchesFilter
+                );
+
+              })
+
+              .map((parking) => (
+
+                <div
+                  key={parking.id}
+                  className="bg-gray-50 rounded-3xl border p-6 flex flex-col md:flex-row gap-6"
+                >
+
+                  <img
+                    src={parking.image}
+                    className="w-full md:w-72 h-52 object-cover rounded-2xl"
+                  />
+
+                  <div className="flex-1">
+
+                    <div className="flex flex-col md:flex-row md:justify-between gap-6">
+
+                      <div>
+
+                        {/* BADGES */}
+
+                        <div className="flex flex-wrap gap-3 mb-4">
+
+                          <span
+                            className={`px-4 py-2 rounded-xl font-bold text-white ${
+                              parking.status ===
+                              "Approved"
+                                ? "bg-green-500"
+                                : "bg-orange-500"
+                            }`}
+                          >
+
+                            {parking.status}
+
+                          </span>
+
+                          <span
+                            className={`px-4 py-2 rounded-xl font-bold text-white ${
+                              parking.availability ===
+                              "Available"
+                                ? "bg-green-500"
+                                : "bg-red-500"
+                            }`}
+                          >
+
+                            {parking.availability}
+
+                          </span>
+
+                          {parking.featured && (
+
+                            <span className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold">
+
+                              Featured
+
+                            </span>
+
+                          )}
+
+                          {parking.verified && (
+
+                            <span className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold">
+
+                              Verified
+
+                            </span>
+
+                          )}
+
+                        </div>
+
+                        <h3 className="text-3xl font-bold mb-3">
+
+                          {parking.title}
+
+                        </h3>
+
+                        <p className="text-gray-500 mb-3">
+
+                          {parking.location}
+
+                        </p>
+
+                        <p className="text-green-600 font-bold text-2xl mb-4">
+
+                          ₹
+                          {parking.monthlyPrice}
+                          /month
+
+                        </p>
+
+                        {/* OWNER */}
+
+                        <div className="flex items-center gap-4">
+
+                          <img
+                            src={
+                              parking.ownerPhoto ||
+                              "https://ui-avatars.com/api/?name=User&background=16a34a&color=fff"
+                            }
+                            className="w-16 h-16 rounded-full object-cover"
+                          />
+
+                          <div>
+
+                            <h4 className="font-bold text-xl">
+
+                              {parking.ownerName}
+
+                            </h4>
+
+                            <p className="text-gray-500">
+
+                              {parking.ownerEmail}
+
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                      </div>
+
+                      {/* ACTIONS */}
+
+                      <div className="flex flex-col gap-4">
+
+                        {/* APPROVE */}
+
+                        <button
+
+                          onClick={async () => {
+
+                            await updateDoc(
+
+                              doc(
+                                db,
+                                "parkings",
+                                parking.id
+                              ),
+
+                              {
+                                status:
+                                  parking.status ===
+                                  "Approved"
+                                    ? "Pending"
+                                    : "Approved",
+                              }
+
+                            );
+
+                            if (
+  parking.status !== "Approved"
+) {
+
+  await addDoc(
+    collection(
+      db,
+      "notifications"
+    ),
+    {
+      ownerEmail:
+        parking.ownerEmail,
+
+      title:
+        "Listing Approved",
+
+      message: `${parking.title} approved by admin`,
+
+      createdAt:
+        new Date(),
+
+      read: false,
+    }
+  );
+
+}
+
+                            alert(
+                              parking.status ===
+                                "Approved"
+                                ? "Moved To Pending"
+                                : "Listing Approved"
+                            );
+
+                          }}
+
+                          className={`px-6 py-4 rounded-2xl font-bold text-white ${
+                            parking.status ===
+                            "Approved"
+                              ? "bg-orange-500"
+                              : "bg-green-500"
+                          }`}
+
+                        >
+
+                          {parking.status ===
+                          "Approved"
+                            ? "Move To Pending"
+                            : "Approve Listing"}
+
+                        </button>
+
+                        {/* VERIFY */}
+
+                        <button
+
+                          onClick={async () => {
+
+                            await updateDoc(
+
+                              doc(
+                                db,
+                                "parkings",
+                                parking.id
+                              ),
+
+                              {
+                                verified:
+                                  !parking.verified,
+                              }
+
+                            );
+
+                            alert(
+                              parking.verified
+                                ? "Verification Removed"
+                                : "Owner Verified"
+                            );
+
+                          }}
+
+                          className={`px-6 py-4 rounded-2xl font-bold text-white ${
+                            parking.verified
+                              ? "bg-gray-500"
+                              : "bg-blue-500"
+                          }`}
+
+                        >
+
+                          {parking.verified
+                            ? "Remove Verification"
+                            : "Verify Owner"}
+
+                        </button>
+
+                        {/* FEATURED */}
+
+                        <button
+
+                          onClick={async () => {
+
+                            await updateDoc(
+
+                              doc(
+                                db,
+                                "parkings",
+                                parking.id
+                              ),
+
+                              {
+                                featured:
+                                  !parking.featured,
+                              }
+
+                            );
+
+                            alert(
+                              parking.featured
+                                ? "Featured Removed"
+                                : "Listing Featured"
+                            );
+
+                          }}
+
+                          className={`px-6 py-4 rounded-2xl font-bold text-white ${
+                            parking.featured
+                              ? "bg-gray-500"
+                              : "bg-purple-600"
+                          }`}
+
+                        >
+
+                          {parking.featured
+                            ? "Remove Featured"
