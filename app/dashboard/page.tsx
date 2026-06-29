@@ -11,6 +11,7 @@ import {
   where,
   getDocs,
   orderBy,
+  updateDoc,
 } from "firebase/firestore";
 
 import {
@@ -27,6 +28,16 @@ export default function DashboardPage() {
 
   const [bookings, setBookings] =
     useState<any[]>([]);
+
+    const [
+  bookingFilter,
+  setBookingFilter
+] = useState("Pending Approval");
+
+const [
+  bookingSearch,
+  setBookingSearch
+] = useState("");
 
     const [notifications, setNotifications] =
   useState<any[]>([]);
@@ -75,11 +86,11 @@ export default function DashboardPage() {
 
       collection(db, "parkings"),
 
-      where(
-        "ownerEmail",
-        "==",
-        user.email
-      )
+where(
+  "ownerUid",
+  "==",
+  user.uid
+)
 
     );
 
@@ -130,17 +141,18 @@ export default function DashboardPage() {
               const data =
                 doc.data();
 
-              const ownerEmails =
+             const ownerUids =
   parkingData.map(
     (item) =>
-      item.ownerEmail
+      item.ownerUid
   );
 
 if (
-  ownerEmails.includes(
-    data.ownerEmail
+  ownerUids.includes(
+    data.ownerUid
   )
-) {
+)
+{
 
                 bookingData.push({
 
@@ -272,7 +284,7 @@ if (
   new Set(
     bookings.map(
       (item) =>
-        item.email
+        item.customerUid
     )
   ).size;
 
@@ -322,6 +334,66 @@ if (
 
     }
   );
+
+  const pendingBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+      "Pending Approval"
+  );
+
+const approvedBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+      "Approved"
+  );
+
+const rejectedBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+      "Rejected"
+  );
+
+const visibleBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+      bookingFilter
+  )
+  .filter((booking) => {
+
+    const search =
+      bookingSearch.toLowerCase();
+
+    return (
+
+      booking.customerName
+        ?.toLowerCase()
+        .includes(search)
+
+      ||
+
+      booking.customerEmail
+        ?.toLowerCase()
+        .includes(search)
+
+      ||
+
+      booking.vehicleNumber
+        ?.toLowerCase()
+        .includes(search)
+
+      ||
+
+      booking.bookingId
+        ?.toLowerCase()
+        .includes(search)
+
+    );
+
+  });
 
   if (!user) {
 
@@ -600,13 +672,13 @@ if (
         (booking) => (
 
           <div
-            key={booking.id}
+            key={booking.bookingId}
             className="border rounded-2xl p-4"
           >
 
             <h3 className="text-xl font-bold">
 
-              {booking.name}
+              {booking.customerName}
 
             </h3>
 
@@ -620,21 +692,23 @@ if (
 
               Expires On:
               {" "}
-              {booking.validTill}
+              {new Date(
+  booking.validTill
+).toLocaleDateString()}
 
             </p>
 
             <div className="flex gap-3 mt-4">
 
               <a
-                href={`tel:${booking.phone}`}
+                href={`tel:${booking.customerPhone}`}
                 className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold"
               >
                 📞 Call
               </a>
 
               <a
-                href={`https://wa.me/91${booking.phone}`}
+                href={`https://wa.me/91${booking.customerPhone}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-green-500 text-white px-4 py-2 rounded-xl font-bold"
@@ -918,9 +992,79 @@ if (
 
             </h2>
 
+            <div className="flex flex-wrap gap-4 mt-6">
+
+              <input
+  type="text"
+  placeholder="Search Booking ID, Vehicle Number, Customer..."
+  value={bookingSearch}
+  onChange={(e) =>
+    setBookingSearch(
+      e.target.value
+    )
+  }
+  className="w-full border p-4 rounded-2xl mb-5"
+/>
+
+  <button
+    onClick={() =>
+      setBookingFilter(
+        "Pending Approval"
+      )
+    }
+    className={`px-5 py-3 rounded-2xl font-bold ${
+      bookingFilter ===
+      "Pending Approval"
+        ? "bg-yellow-500 text-white"
+        : "bg-gray-200"
+    }`}
+  >
+    🟡 Pending (
+    {pendingBookings.length}
+    )
+  </button>
+
+  <button
+    onClick={() =>
+      setBookingFilter(
+        "Approved"
+      )
+    }
+    className={`px-5 py-3 rounded-2xl font-bold ${
+      bookingFilter ===
+      "Approved"
+        ? "bg-green-600 text-white"
+        : "bg-gray-200"
+    }`}
+  >
+    🟢 Approved (
+    {approvedBookings.length}
+    )
+  </button>
+
+  <button
+    onClick={() =>
+      setBookingFilter(
+        "Rejected"
+      )
+    }
+    className={`px-5 py-3 rounded-2xl font-bold ${
+      bookingFilter ===
+      "Rejected"
+        ? "bg-red-600 text-white"
+        : "bg-gray-200"
+    }`}
+  >
+    🔴 Rejected (
+    {rejectedBookings.length}
+    )
+  </button>
+
+</div>
+
             <div className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold">
 
-              {bookings.length} Bookings
+              {visibleBookings.length} Bookings
 
             </div>
 
@@ -948,19 +1092,31 @@ if (
 
             <div className="grid gap-8">
 
-              {bookings.map((booking) => (
+              {visibleBookings.map((booking) => (
 
                 <div
-                  key={booking.id}
+                  key={booking.bookingId}
                   className="border rounded-3xl p-6 flex flex-col lg:flex-row gap-8 bg-gray-50"
                 >
 
                   {/* IMAGE */}
 
-                  <img
-                    src={booking.image}
-                    className="w-full lg:w-52 h-52 rounded-3xl object-cover"
-                  />
+                 {booking.vehicleImage ? (
+
+  <img
+    src={booking.vehicleImage}
+    className="w-full lg:w-52 h-52 rounded-3xl object-cover"
+  />
+
+) : (
+
+  <div className="w-full lg:w-52 h-52 rounded-3xl bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+
+    No Vehicle Image
+
+  </div>
+
+)}
 
                   {/* CONTENT */}
 
@@ -970,17 +1126,25 @@ if (
 
                     <div className="flex flex-wrap gap-3 mb-5">
 
-                      <span className="bg-green-500 text-white px-4 py-2 rounded-xl font-bold">
+  <span className="bg-green-500 text-white px-4 py-2 rounded-xl font-bold">
+    {booking.paymentStatus}
+  </span>
 
-                        {booking.paymentStatus}
+<span
+  className={`text-white px-4 py-2 rounded-xl font-bold ${
+    booking.bookingStatus === "Approved"
+      ? "bg-green-600"
+      : booking.bookingStatus === "Rejected"
+      ? "bg-red-600"
+      : "bg-yellow-500"
+  }`}
+>
+  {booking.bookingStatus || "Pending Approval"}
+</span>
 
-                      </span>
-
-                      <span className="bg-black text-white px-4 py-2 rounded-xl font-bold">
-
-                        {booking.plan}
-
-                      </span>
+  <span className="bg-black text-white px-4 py-2 rounded-xl font-bold">
+    {booking.plan}
+  </span>
 
                     </div>
 
@@ -998,57 +1162,65 @@ if (
 
                     {/* CUSTOMER */}
 
-                    <div className="grid md:grid-cols-2 gap-5 mb-6">
+                    {/* CUSTOMER & VEHICLE */}
 
-                      <div className="bg-white p-5 rounded-2xl">
+<div className="grid md:grid-cols-2 gap-5 mb-6">
 
-                        <p className="text-gray-500 mb-2">
+  <div className="bg-white p-5 rounded-2xl">
 
-                          Customer Name
+    <h3 className="font-bold text-xl mb-4">
+      Customer Information
+    </h3>
 
-                        </p>
+    <p>
+      <b>Name:</b> {booking.customerName}
+    </p>
 
-                        <h3 className="text-xl font-bold">
+    <p className="mt-2">
+      <b>Email:</b> {booking.customerEmail}
+    </p>
 
-                          {booking.name}
+    <p className="mt-2">
+      <b>Phone:</b>{" "}
+      {booking.customerPhone || "Not Available"}
+    </p>
 
-                        </h3>
+  </div>
 
-                      </div>
+  <div className="bg-white p-5 rounded-2xl">
 
-                      <div className="bg-white p-5 rounded-2xl">
+    <h3 className="font-bold text-xl mb-4">
+      Vehicle Information
+    </h3>
 
-                        <p className="text-gray-500 mb-2">
+    <p>
+      <b>Brand:</b>{" "}
+      {booking.vehicleBrand}
+    </p>
 
-                          Customer Email
+    <p className="mt-2">
+      <b>Model:</b>{" "}
+      {booking.vehicleModel}
+    </p>
 
-                        </p>
+    <p className="mt-2">
+      <b>Number:</b>{" "}
+      {booking.vehicleNumber}
+    </p>
 
-                        <h3 className="text-lg font-bold break-all">
+    <p className="mt-2">
+      <b>Type:</b>{" "}
+      {booking.vehicleType}
+    </p>
 
-                          {booking.email}
+    <p className="mt-2">
+      <b>Color:</b>{" "}
+      {booking.vehicleColor}
+    </p>
 
-                        </h3>
-
-                      </div>
-
-                      <div className="bg-white p-5 rounded-2xl">
-
-  <p className="text-gray-500 mb-2">
-
-    Customer Phone
-
-  </p>
-
-  <h3 className="text-lg font-bold">
-
-    {booking.phone || "Not Available"}
-
-  </h3>
+  </div>
 
 </div>
-
-                    </div>
 
                     {/* BOOKING DETAILS */}
 
@@ -1064,7 +1236,11 @@ if (
 
                         <h3 className="font-bold">
 
-                          {booking.bookingDate}
+                          {new Date(
+  booking.bookingDate?.seconds
+    ? booking.bookingDate.seconds * 1000
+    : booking.bookingDate
+).toLocaleString()}
 
                         </h3>
 
@@ -1080,7 +1256,9 @@ if (
 
                         <h3 className="font-bold">
 
-                          {booking.validTill}
+                          {new Date(
+  booking.validTill
+).toLocaleDateString()}
 
                         </h3>
 
@@ -1106,20 +1284,82 @@ if (
                     <div className="flex flex-wrap gap-4 mt-6">
 
   <a
-    href={`tel:${booking.phone}`}
+    href={`tel:${booking.customerPhone}`}
     className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold"
   >
     📞 Call Customer
   </a>
 
   <a
-    href={`https://wa.me/91${booking.phone}`}
+    href={`https://wa.me/91${booking.customerPhone}`}
     target="_blank"
     rel="noopener noreferrer"
     className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold"
   >
     💬 WhatsApp Customer
   </a>
+
+  {booking.bookingStatus ===
+"Pending Approval" && (
+
+  <>
+
+    <button
+      onClick={async () => {
+
+        await updateDoc(
+          doc(
+            db,
+            "bookings",
+            booking.id
+          ),
+          {
+            bookingStatus:
+              "Approved",
+          }
+        );
+
+        alert(
+          "Booking Approved"
+        );
+
+      }}
+      className="bg-green-700 text-white px-6 py-3 rounded-2xl font-bold"
+    >
+      ✅ Approve Booking
+    </button>
+
+    <button
+      onClick={async () => {
+
+        await updateDoc(
+          doc(
+            db,
+            "bookings",
+            booking.id
+          ),
+          {
+            bookingStatus:
+              "Rejected",
+
+            paymentStatus:
+              "Refund Pending",
+          }
+        );
+
+        alert(
+          "Booking Rejected"
+        );
+
+      }}
+      className="bg-red-600 text-white px-6 py-3 rounded-2xl font-bold"
+    >
+      ❌ Reject Booking
+    </button>
+
+  </>
+
+)}
 
 </div>
 

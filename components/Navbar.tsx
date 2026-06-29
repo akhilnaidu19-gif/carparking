@@ -10,6 +10,9 @@ import { app } from "@/lib/firebase";
 export default function Navbar() {
   const [user, setUser] = useState<any>(null);
 
+  const [userPhoto, setUserPhoto] =
+  useState("");
+
 const auth = getAuth(app);
 
 useEffect(() => {
@@ -18,6 +21,12 @@ useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => {
 
       setUser(currentUser);
+
+setUserPhoto(
+  localStorage.getItem(
+    "userPhoto"
+  ) || ""
+);
 
     });
 
@@ -76,10 +85,10 @@ useEffect(() => {
   <div className="relative group">
 
     <img
-      src={
-        user.photoURL ||
-        "https://via.placeholder.com/50"
-      }
+  src={
+    userPhoto ||
+    "https://via.placeholder.com/50"
+  }
       alt="Profile"
       className="w-12 h-12 rounded-full object-cover border-2 border-green-500 cursor-pointer"
     />
@@ -114,12 +123,18 @@ useEffect(() => {
           My Bookings
         </Link>
 
-        <Link
-          href="/dashboard"
-          className="bg-black text-white text-center py-2 rounded-lg"
-        >
-          Dashboard
-        </Link>
+        {localStorage.getItem(
+  "isAdmin"
+) === "true" && (
+
+  <Link
+    href="/admin"
+    className="bg-black text-white text-center py-2 rounded-lg"
+  >
+    Admin Panel
+  </Link>
+
+)}
 
         <button
           onClick={async () => {

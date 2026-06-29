@@ -1876,6 +1876,16 @@ return (
 
         <div className="flex flex-wrap gap-3">
 
+          {user.role === "admin" && (
+
+  <div className="bg-purple-600 text-white px-5 py-3 rounded-2xl font-bold">
+
+    Administrator
+
+  </div>
+
+)}
+
           <span
             className={`px-5 py-3 rounded-2xl text-white font-bold ${
               user.status === "Blocked"
@@ -1892,25 +1902,37 @@ return (
 
             onClick={async () => {
 
-              await updateDoc(
+  if (
+    user.role === "admin"
+  ) {
 
-                doc(
-                  db,
-                  "users",
-                  user.id
-                ),
+    alert(
+      "Admin accounts cannot be blocked"
+    );
 
-                {
-                  status:
-                    user.status ===
-                    "Blocked"
-                      ? "Active"
-                      : "Blocked",
-                }
+    return;
 
-              );
+  }
 
-            }}
+  await updateDoc(
+
+    doc(
+      db,
+      "users",
+      user.id
+    ),
+
+    {
+      status:
+        user.status ===
+        "Blocked"
+          ? "Active"
+          : "Blocked",
+    }
+
+  );
+
+}}
 
             className={`px-6 py-3 rounded-2xl font-bold text-white ${
               user.status ===
@@ -1934,15 +1956,27 @@ return (
 
             onClick={async () => {
 
-              const confirmDelete =
-                confirm(
-                  "Delete User Profile?"
-                );
+  if (
+    user.role === "admin"
+  ) {
 
-              if (!confirmDelete)
-                return;
+    alert(
+      "Admin accounts cannot be deleted"
+    );
 
-              await deleteDoc(
+    return;
+
+  }
+
+  const confirmDelete =
+    confirm(
+      "Delete User Profile?"
+    );
+
+  if (!confirmDelete)
+    return;
+
+  await deleteDoc(
 
                 doc(
                   db,
@@ -2135,7 +2169,11 @@ return (
             </h3>
 
             <p>
-              {booking.bookingDate}
+              {booking.bookingDate?.seconds
+  ? new Date(
+      booking.bookingDate.seconds * 1000
+    ).toLocaleString()
+  : "N/A"}
             </p>
 
           </div>

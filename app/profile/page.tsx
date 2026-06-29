@@ -96,10 +96,11 @@ export default function ProfilePage() {
                 data.city || ""
               );
 
-              setPhotoURL(
-                data.photoURL ||
-                  ""
-              );
+             setPhotoURL(
+  data.photoURL ||
+  data.photo ||
+  ""
+);
 
             }
 
@@ -187,34 +188,36 @@ export default function ProfilePage() {
         // FIRESTORE SAVE
 
         await setDoc(
-          doc(
-            db,
-            "users",
-            user.uid
-          ),
+  doc(
+    db,
+    "users",
+    user.uid
+  ),
 
-          {
+  {
+    name,
+    phone,
+    city,
 
-            name,
+    photoURL:
+      uploadedPhoto,
 
-            phone,
+    email:
+      user.email,
 
-            city,
+    verified:
+      false,
 
-            photoURL:
-              uploadedPhoto,
+    updatedAt:
+      new Date(),
 
-            email:
-              user.email,
+  },
 
-            verified: false,
+  {
+    merge: true,
+  }
 
-            updatedAt:
-              new Date(),
-
-          }
-
-        );
+);
 
         localStorage.setItem(
   "userPhone",

@@ -37,6 +37,11 @@ export default function BookingsPage() {
 };
 
   const [bookings, setBookings] = useState<any[]>([]);
+
+  const [
+  bookingFilter,
+  setBookingFilter
+] = useState("Active");
   const getBookingStatus = (
   validTill: string
 ) => {
@@ -81,6 +86,8 @@ const getDaysRemaining = (
   validTill: string
 ) => {
 
+  
+
   const expiryDate =
     new Date(validTill);
 
@@ -100,14 +107,61 @@ const getDaysRemaining = (
   return daysLeft;
 
 };
+
+const activeBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+        "Approved" &&
+      !isExpired(
+        booking.validTill
+      )
+  );
+
+const pendingBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+      "Pending Approval"
+  );
+
+const rejectedBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+      "Rejected"
+  );
+
+const expiredBookings =
+  bookings.filter(
+    (booking) =>
+      isExpired(
+        booking.validTill
+      )
+  );
+
+  const visibleBookings =
+  bookingFilter === "Active"
+    ? activeBookings
+    : bookingFilter ===
+      "Pending"
+    ? pendingBookings
+    : bookingFilter ===
+      "Rejected"
+    ? rejectedBookings
+    : expiredBookings;
+
+
   const qrRefs = useRef<any>({});
 
   useEffect(() => {
 
     const fetchBookings = async () => {
 
-      const userEmail =
-        localStorage.getItem("userEmail");
+      const userUid =
+  localStorage.getItem(
+    "userUid"
+  );
 
       const querySnapshot = await getDocs(
         collection(db, "bookings")
@@ -120,7 +174,10 @@ const getDaysRemaining = (
   const data =
     docSnapshot.data();
 
-  if (data.email === userEmail) {
+  if (
+  data.customerUid ===
+  userUid
+) {
 
     if (
       isExpired(
@@ -184,18 +241,121 @@ const getDaysRemaining = (
           My Bookings
         </h1>
 
+        <div className="flex flex-wrap gap-4 mb-10">
+
+  <button
+    onClick={() =>
+      setBookingFilter("Active")
+    }
+    className={`px-5 py-3 rounded-2xl font-bold ${
+      bookingFilter === "Active"
+        ? "bg-green-600 text-white"
+        : "bg-gray-200"
+    }`}
+  >
+    🟢 Active (
+    {activeBookings.length}
+    )
+  </button>
+
+  <button
+    onClick={() =>
+      setBookingFilter("Pending")
+    }
+    className={`px-5 py-3 rounded-2xl font-bold ${
+      bookingFilter === "Pending"
+        ? "bg-yellow-500 text-white"
+        : "bg-gray-200"
+    }`}
+  >
+    🟡 Pending (
+    {pendingBookings.length}
+    )
+  </button>
+
+  <button
+    onClick={() =>
+      setBookingFilter("Rejected")
+    }
+    className={`px-5 py-3 rounded-2xl font-bold ${
+      bookingFilter === "Rejected"
+        ? "bg-red-600 text-white"
+        : "bg-gray-200"
+    }`}
+  >
+    🔴 Rejected (
+    {rejectedBookings.length}
+    )
+  </button>
+
+  <button
+    onClick={() =>
+      setBookingFilter("Expired")
+    }
+    className={`px-5 py-3 rounded-2xl font-bold ${
+      bookingFilter === "Expired"
+        ? "bg-black text-white"
+        : "bg-gray-200"
+    }`}
+  >
+    ⚫ Expired (
+    {expiredBookings.length}
+    )
+  </button>
+
+</div>
+
         <div className="grid gap-6">
 
-          {bookings.map((booking) => (<div
-  key={booking.id}
+          {visibleBookings.map((booking) => (<div
+  key={booking.bookingId}
   className="bg-white rounded-3xl shadow-xl overflow-hidden"
 >
 
+<div className="relative">
+
+
+    {booking.image ? (
+
   <img
     src={booking.image}
-    alt={booking.title}
-    className="w-full h-72 object-cover"
+alt={booking.parkingTitle}
+    className="w-full h-48 object-cover"
   />
+
+) : (
+
+  <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+
+    No Parking Image
+
+  </div>
+
+)}
+
+  <div className="absolute top-4 right-4 flex gap-2">
+
+    <span
+      className="bg-green-500 text-white px-4 py-2 rounded-xl font-bold"
+    >
+      {booking.paymentStatus}
+    </span>
+
+    <span
+      className={`px-4 py-2 rounded-xl text-white font-bold ${
+        booking.bookingStatus === "Approved"
+          ? "bg-green-600"
+          : booking.bookingStatus === "Rejected"
+          ? "bg-red-600"
+          : "bg-yellow-500"
+      }`}
+    >
+      {booking.bookingStatus}
+    </span>
+
+  </div>
+
+</div>
 
   <div className="p-8">
 
@@ -204,37 +364,16 @@ const getDaysRemaining = (
       <div>
 
         <h2 className="text-4xl font-bold mb-2">
-          {booking.title}
+          {booking.parkingTitle}
         </h2>
 
         <p className="text-gray-500 text-lg">
-          {booking.location}
+          {booking.parkingLocation}
         </p>
 
       </div>
 
-      <span
-  className={`px-5 py-3 rounded-2xl text-white font-bold ${
-    isExpired(
-      booking.validTill
-    )
-      ? "bg-red-500"
-      : booking.paymentStatus ===
-        "Paid"
-      ? "bg-green-500"
-      : "bg-red-500"
-  }`}
->
-
-  {isExpired(
-    booking.validTill
-  )
-
-    ? "Expired"
-
-    : booking.paymentStatus}
-
-</span>
+      
 
     </div>
 
@@ -274,47 +413,51 @@ const getDaysRemaining = (
 
     {/* DETAILS */}
 
-    <div className="grid md:grid-cols-2 gap-5 mb-8">
+    <div className="grid md:grid-cols-5 gap-3 mb-8">
 
-      <div className="bg-gray-100 p-5 rounded-2xl">
+      <div className="bg-gray-100 p-3 rounded-2xl">
 
         <p className="text-gray-500 mb-1">
           Booking ID
         </p>
 
-        <p className="font-bold">
-          {booking.id}
+        <p className="font-semibold text-sm">
+          {booking.bookingId}
         </p>
 
       </div>
 
-      <div className="bg-gray-100 p-5 rounded-2xl">
+      <div className="bg-gray-100 p-3 rounded-2xl">
 
         <p className="text-gray-500 mb-1">
           Plan
         </p>
 
-        <p className="font-bold">
+        <p className="font-semibold text-sm">
           {booking.plan}
         </p>
 
       </div>
 
-      <div className="bg-gray-100 p-5 rounded-2xl">
+      <div className="bg-gray-100 p-3 rounded-2xl">
 
         <p className="text-gray-500 mb-1">
           Booking Date
         </p>
 
-        <p className="font-bold">
-          {booking.bookingDate}
+        <p className="font-semibold text-sm">
+          {booking.bookingDate?.seconds
+  ? new Date(
+      booking.bookingDate.seconds * 1000
+    ).toLocaleString()
+  : "N/A"}
         </p>
 
       </div>
 
-      <div className="bg-gray-100 p-5 rounded-2xl">
+      <div className="bg-gray-100 p-3 rounded-2xl">
 
-  <p className="text-gray-500 mb-1">
+  <p className="font-semibold text-green-600 text-sm">
     Amount Paid
   </p>
 
@@ -324,7 +467,7 @@ const getDaysRemaining = (
 
 </div>
 
-      <div className="bg-gray-100 p-5 rounded-2xl">
+      <div className="bg-gray-100 p-3 rounded-2xl">
 
         <p className="text-gray-500 mb-1">
           Valid Till
@@ -332,9 +475,11 @@ const getDaysRemaining = (
 
         <div>
 
-  <p className="font-bold">
-    {booking.validTill}
-  </p>
+<p className="font-semibold text-sm">
+  {new Date(
+    booking.validTill
+  ).toLocaleDateString()}
+</p>
 
   <p className="text-blue-600 font-bold mt-2">
 
@@ -372,13 +517,15 @@ const getDaysRemaining = (
 
     {/* BOOKING QR */}
 
-<div className="bg-gray-100 rounded-3xl p-6 mb-8">
+<details className="bg-gray-100 rounded-3xl p-6 mb-8">
 
-  <h3 className="text-2xl font-bold mb-4">
+  <summary className="text-2xl font-bold cursor-pointer">
 
     Booking QR Pass
 
-  </h3>
+  </summary>
+
+
 
   <div className="flex flex-col items-center">
 
@@ -386,12 +533,12 @@ const getDaysRemaining = (
   ref={(el) => {
     qrRefs.current[booking.id] = el;
   }}
-  value={JSON.stringify({
-    bookingId: booking.id,
-    parking: booking.title,
-    customer: booking.name,
-    validTill: booking.validTill,
-  })}
+value={JSON.stringify({
+  bookingId: booking.id,
+  parking: booking.title,
+  customer: booking.customerName,
+  validTill: booking.validTill,
+})}
   size={180}
 />
 
@@ -403,7 +550,7 @@ const getDaysRemaining = (
 
   </div>
 
-</div>
+</details>
 
     <div className="flex flex-col md:flex-row gap-4">
 
@@ -430,7 +577,7 @@ I booked your parking space:
 
 ${booking.title}
 
-Booking ID: ${booking.id}
+Booking ID: ${booking.bookingId}
 
 Please share further details.`
   )}`}
@@ -464,7 +611,7 @@ Please share further details.`
     link.href = url;
 
     link.download =
-      `booking-${booking.id}.png`;
+      `booking-${booking.bookingId}.png`;
 
     link.click();
 
@@ -574,7 +721,7 @@ Please share further details.`
                     "Booking Renewed",
 
                   message:
-                    `${booking.name} renewed ${booking.title}`,
+  `${booking.customerName} renewed ${booking.title}`,
 
                   createdAt:
                     new Date(),
@@ -604,14 +751,9 @@ Please share further details.`
           },
 
         prefill: {
-
-          name:
-            booking.name || "",
-
-          email:
-            booking.email || "",
-
-        },
+  name: booking.customerName || "",
+  email: booking.customerEmail || "",
+},
 
         theme: {
 

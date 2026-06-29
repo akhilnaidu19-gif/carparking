@@ -2,17 +2,39 @@
 
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc,doc,
+getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Script from "next/script";
+import { useSearchParams } from "next/navigation";
 
 export default function BookingPage() {
 
   const params = useParams();
-  const [name, setName] = useState("");
-const [email, setEmail] = useState("");
+  const searchParams =
+  useSearchParams();
+
+const plan =
+  searchParams.get("plan") ||
+  "Monthly";
+
 const [date, setDate] = useState("");
 const [time, setTime] = useState("");
+
+const [vehicleType, setVehicleType] =
+  useState("Car");
+
+const [vehicleNumber, setVehicleNumber] =
+  useState("");
+
+const [vehicleBrand, setVehicleBrand] =
+  useState("");
+
+const [vehicleModel, setVehicleModel] =
+  useState("");
+
+const [vehicleColor, setVehicleColor] =
+  useState("");
 
   return (
     <>
@@ -29,23 +51,40 @@ const [time, setTime] = useState("");
           Booking Parking ID: {params.id}
         </p>
 
+        <div className="bg-green-100 border border-green-400 p-4 rounded-2xl mb-8">
+
+  <h2 className="text-2xl font-bold text-green-700">
+
+    Selected Plan: {plan}
+
+  </h2>
+
+  <p className="text-gray-600">
+
+    {
+      plan === "Monthly"
+        ? "₹3000 / Month"
+        : "₹30000 / Year"
+    }
+
+  </p>
+
+</div>
+
         <div className="grid md:grid-cols-2 gap-6">
 
-          <input
-  type="text"
-  placeholder="Your Name"
-  value={name}
-  onChange={(e) => setName(e.target.value)}
-  className="border p-4 rounded-2xl"
-/>
+          <div className="bg-green-100 p-4 rounded-2xl mb-6">
 
-         <input
-  type="email"
-  placeholder="Your Email"
-  value={email}
-  onChange={(e) => setEmail(e.target.value)}
-  className="border p-4 rounded-2xl"
-/>
+  <h2 className="text-2xl font-bold">
+
+    Selected Plan:
+    {plan}
+
+  </h2>
+
+</div>
+
+        
 
          <input
   type="date"
@@ -61,30 +100,189 @@ const [time, setTime] = useState("");
   className="border p-4 rounded-2xl"
 />
 
+<select
+  value={vehicleType}
+  onChange={(e) =>
+    setVehicleType(e.target.value)
+  }
+  className="border p-4 rounded-2xl"
+>
+  <option>Car</option>
+  <option>Bike</option>
+  <option>SUV</option>
+  <option>Van</option>
+</select>
+
+<input
+  type="text"
+  placeholder="Vehicle Number"
+  value={vehicleNumber}
+  onChange={(e) =>
+    setVehicleNumber(
+      e.target.value
+    )
+  }
+  className="border p-4 rounded-2xl"
+/>
+
+<input
+  type="text"
+  placeholder="Vehicle Brand"
+  value={vehicleBrand}
+  onChange={(e) =>
+    setVehicleBrand(
+      e.target.value
+    )
+  }
+  className="border p-4 rounded-2xl"
+/>
+
+<input
+  type="text"
+  placeholder="Vehicle Model"
+  value={vehicleModel}
+  onChange={(e) =>
+    setVehicleModel(
+      e.target.value
+    )
+  }
+  className="border p-4 rounded-2xl"
+/>
+
+<input
+  type="text"
+  placeholder="Vehicle Color"
+  value={vehicleColor}
+  onChange={(e) =>
+    setVehicleColor(
+      e.target.value
+    )
+  }
+  className="border p-4 rounded-2xl"
+/>
+
         </div>
 
         <button
   onClick={async () => {
 
-   const bookingData = {
-  parkingId: params.id,
-  name,
-  email,
+    const parkingDoc = await getDoc(
+  doc(
+    db,
+    "parkings",
+    params.id as string
+  )
+);
+
+const parkingData =
+  parkingDoc.data();
+
+  const validTill =
+  new Date();
+
+if (plan === "Monthly") {
+
+  validTill.setDate(
+    validTill.getDate() + 30
+  );
+
+} else {
+
+  validTill.setDate(
+    validTill.getDate() + 365
+  );
+
+}
+
+const bookingData = {
+
+bookingId:
+  "BK" +
+  Math.floor(
+    1000 +
+    Math.random() * 9000
+  ),
+
+  parkingId:
+    params.id,
+
+  customerUid:
+    localStorage.getItem(
+      "userUid"
+    ),
+
+
+
+customerName:
+  localStorage.getItem(
+    "userName"
+  ),
+
+customerEmail:
+  localStorage.getItem(
+    "userEmail"
+  ),
+
+customerPhone:
+  localStorage.getItem(
+    "userPhone"
+  ),
+
+  ownerUid:
+    parkingData?.ownerUid,
+
+  ownerEmail:
+    parkingData?.ownerEmail,
+
+  parkingTitle:
+    parkingData?.title,
+
+  plan,
+
+  amount:
+  plan === "Monthly"
+    ? 3000
+    : 30000,
+
+    validTill:
+  validTill.toISOString(),
+
+  vehicleType,
+
+  vehicleNumber:
+    vehicleNumber
+      .toUpperCase()
+      .trim(),
+
+  vehicleBrand,
+
+  vehicleModel,
+
+  vehicleColor,
+
+  bookingStatus:
+    "Pending Approval",
+
+  paymentStatus:
+    "Paid",
+
+  bookingDate:
+    new Date(),
+
   date,
   time,
-  paymentStatus: "Paid",
 };
 
     try {
 
-      await addDoc(
-        collection(db, "bookings"),
-        bookingData
-      );
+
 
       const options = {
-  key: "rzp_test_StsoQkPsUQ363R",
-  amount: 50000,
+  key: "rzp_test_Su5POE7a3UsqZv",
+amount:
+  plan === "Monthly"
+    ? 300000
+    : 3000000,
   currency: "INR",
   name: "CarParking Bangalore",
   description: "Parking Booking Payment",

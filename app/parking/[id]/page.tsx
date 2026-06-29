@@ -737,10 +737,9 @@ phone:
               <button
 
                 onClick={() =>
-                  handleBooking(
-                    "Monthly"
-                  )
-                }
+  window.location.href =
+    `/booking/${parking.id}?plan=Monthly`
+}
 
                 disabled={
                   parking.availability ===
@@ -780,11 +779,10 @@ phone:
 
               <button
 
-                onClick={() =>
-                  handleBooking(
-                    "Yearly"
-                  )
-                }
+onClick={() =>
+  window.location.href =
+    `/booking/${parking.id}?plan=Yearly`
+}
 
                 disabled={
                   parking.availability ===
