@@ -171,311 +171,13 @@ export default function ParkingDetailsPage() {
 
       : "0";
 
-  // BOOKING WITH RAZORPAY
-
-  const handleBooking = async (
-    plan: string
-  ) => {
-
-    try {
-
-      const userEmail =
-        localStorage.getItem(
-          "userEmail"
-        );
-
-      const userName =
-        localStorage.getItem(
-          "userName"
-        );
-
-      if (!userEmail) {
-
-        alert(
-          "Please login first"
-        );
-
-        return;
-
-      }
-
-      if (
-        parking.availability ===
-        "Occupied"
-      ) {
-
-        alert(
-          "Parking Already Occupied"
-        );
-
-        return;
-
-      }
-
-      const amount =
-
-        plan === "Monthly"
-
-          ? Number(
-              parking.monthlyPrice
-            )
-
-          : 30000;
-
-      const options = {
-
-        key: process.env
-          .NEXT_PUBLIC_RAZORPAY_KEY_ID,
-
-        amount:
-          amount * 100,
-
-        currency: "INR",
-
-        name:
-          "CarParking Bangalore",
-
-        description:
-          `${plan} Parking Booking`,
-
-        image:
-          parking.image,
-
-        handler:
-          async function (
-            response: any
-          ) {
-
-            try {
-
-              // SAVE BOOKING
-
-              await addDoc(
-
-                collection(
-                  db,
-                  "bookings"
-                ),
-
-                {
-  ownerPhone:
-    parking.ownerPhone || "",
-
-  ownerEmail:
-    parking.ownerEmail || "",
-
-  parkingId:
-    parking.id,
-
-  title:
-    parking.title,
-
-  image:
-    parking.image
-      ? parking.image
-      : "",
-
-  owner:
-    parking.ownerName
-      ? parking.ownerName
-      : "Parking Owner",
-
-  ownerPhoto:
-    parking.ownerPhoto
-      ? parking.ownerPhoto
-      : "",
-
-
-                  location:
-  parking.location
-    ? parking.location
-    : "",
-
-                  latitude:
-  parking.latitude
-    ? parking.latitude
-    : "",
-
-longitude:
-  parking.longitude
-    ? parking.longitude
-    : "",
-
-                  paymentId:
-                    response.razorpay_payment_id,
-
-                  paymentStatus:
-                    "Paid",
-
-                  amount,
-
-                  plan,
-
-                  email:
-  userEmail,
-
-name:
-  userName,
-
-phone:
-  localStorage.getItem(
-    "userPhone"
-  ) || "",
-
-                  bookingDate:
-                    new Date().toLocaleDateString(),
-
-                  bookingTime:
-                    new Date().toLocaleTimeString(),
-
-                  validTill:
-
-                    plan ===
-                    "Monthly"
-
-                      ? new Date(
-
-                          Date.now() +
-
-                            30 *
-                              24 *
-                              60 *
-                              60 *
-                              1000
-
-                        ).toLocaleDateString()
-
-                      : new Date(
-
-                          Date.now() +
-
-                            365 *
-                              24 *
-                              60 *
-                              60 *
-                              1000
-
-                        ).toLocaleDateString(),
-
-                }
-
-              );
-
-              await addDoc(
-
-  collection(
-    db,
-    "notifications"
-  ),
-
-  {
-
-    ownerEmail:
-      parking.ownerEmail || "",
-
-    title:
-      "New Booking",
-
-    message:
-      `${userName} booked ${parking.title}`,
-
-    createdAt:
-      new Date(),
-
-    read: false,
-
-  }
-
-);
-
-              // UPDATE PARKING
-
-              await updateDoc(
-
-                doc(
-                  db,
-                  "parkings",
-                  parking.id
-                ),
-
-                {
-
-                  availability:
-                    "Occupied",
-
-                }
-
-              );
-
-              setParking({
-
-                ...parking,
-
-                availability:
-                  "Occupied",
-
-              });
-
-              alert(
-                "Payment Successful & Booking Confirmed"
-              );
-
-           } catch (error: any) {
-
-  console.log(
-    "BOOKING ERROR:",
-    error
-  );
-
-  alert(
-    error.message ||
-    "Booking Failed"
-  );
-
-}
-
-          },
-
-        prefill: {
-
-          name:
-            userName || "",
-
-          email:
-            userEmail || "",
-
-        },
-
-        theme: {
-
-          color: "#16a34a",
-
-        },
-
-      };
-
-      const razorpay = new (window as any)
-        .Razorpay(options);
-
-      razorpay.open();
-
-    } catch (error) {
-
-      console.log(error);
-
-      alert(
-        "Payment Failed"
-      );
-
-    }
-
-  };
+ 
 
   return (
 
     <>
 
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
+      
 
       <div className="min-h-screen bg-gray-100">
 
@@ -704,6 +406,18 @@ phone:
                   {parking.cctv}
                 </p>
 
+                <div className="bg-gray-100 p-4 rounded-2xl">
+
+  <p className="font-bold">
+    Available Slots
+  </p>
+
+  <p className="text-green-600 text-xl font-bold">
+    {parking.availableSlots} / {parking.totalSlots}
+  </p>
+
+</div>
+
               </div>
 
             </div>
@@ -741,21 +455,17 @@ phone:
     `/booking/${parking.id}?plan=Monthly`
 }
 
-                disabled={
-                  parking.availability ===
-                  "Occupied"
-                }
+              disabled={
+  Number(parking.availableSlots) <= 0
+}
 
                 className="w-full bg-green-500 text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
 
               >
 
-                {parking.availability ===
-                "Occupied"
-
-                  ? "Already Occupied"
-
-                  : "Book Monthly"}
+                {Number(parking.availableSlots) <= 0
+  ? "Fully Occupied"
+  : "Book Monthly"}
 
               </button>
 
@@ -785,18 +495,15 @@ onClick={() =>
 }
 
                 disabled={
-                  parking.availability ===
-                  "Occupied"
-                }
+  Number(parking.availableSlots) <= 0
+}
 
                 className="w-full bg-black text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
 
               >
 
-                {parking.availability ===
-                "Occupied"
-
-                  ? "Already Occupied"
+                {Number(parking.availableSlots) <= 0
+  ? "Fully Occupied"
 
                   : "Book Yearly"}
 

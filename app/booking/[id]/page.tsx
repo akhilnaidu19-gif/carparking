@@ -4,9 +4,17 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { collection, addDoc,doc,
 getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import {
+  db,
+  storage,
+} from "@/lib/firebase";
 import Script from "next/script";
 import { useSearchParams } from "next/navigation";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
 
 export default function BookingPage() {
 
@@ -35,6 +43,12 @@ const [vehicleModel, setVehicleModel] =
 
 const [vehicleColor, setVehicleColor] =
   useState("");
+
+  const [vehicleImage, setVehicleImage] =
+  useState<File | null>(null);
+
+const [uploading, setUploading] =
+  useState(false);
 
   return (
     <>
@@ -161,6 +175,27 @@ const [vehicleColor, setVehicleColor] =
   className="border p-4 rounded-2xl"
 />
 
+<div className="md:col-span-2">
+
+  <label className="block mb-2 font-semibold">
+    Vehicle Image (Optional)
+  </label>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) => {
+      if (e.target.files?.[0]) {
+        setVehicleImage(
+          e.target.files[0]
+        );
+      }
+    }}
+    className="w-full border rounded-2xl p-4"
+  />
+
+</div>
+
         </div>
 
         <button
@@ -176,6 +211,20 @@ const [vehicleColor, setVehicleColor] =
 
 const parkingData =
   parkingDoc.data();
+
+  // CHECK SLOT AVAILABILITY
+
+if (
+  Number(parkingData?.availableSlots) <= 0
+) {
+
+  alert(
+    "This parking is fully occupied."
+  );
+
+  return;
+
+}
 
   const validTill =
   new Date();
@@ -194,6 +243,58 @@ if (plan === "Monthly") {
 
 }
 
+let vehicleImageUrl = "";
+
+if (vehicleImage) {
+
+  setUploading(true);
+
+  const imageRef = ref(
+    storage,
+    `vehicle-images/${Date.now()}-${vehicleImage.name}`
+  );
+
+  await uploadBytes(
+    imageRef,
+    vehicleImage
+  );
+
+  vehicleImageUrl =
+    await getDownloadURL(imageRef);
+
+  setUploading(false);
+}
+
+// RECHECK BEFORE CREATING BOOKING
+
+const latestParkingDoc =
+  await getDoc(
+
+    doc(
+      db,
+      "parkings",
+      parkingDoc.id
+    )
+
+  );
+
+const latestParking =
+  latestParkingDoc.data();
+
+if (
+  Number(
+    latestParking?.availableSlots
+  ) <= 0
+) {
+
+  alert(
+    "Parking became full. Please try another parking."
+  );
+
+  return;
+
+}
+
 const bookingData = {
 
 bookingId:
@@ -203,8 +304,7 @@ bookingId:
     Math.random() * 9000
   ),
 
-  parkingId:
-    params.id,
+
 
   customerUid:
     localStorage.getItem(
@@ -228,14 +328,44 @@ customerPhone:
     "userPhone"
   ),
 
-  ownerUid:
-    parkingData?.ownerUid,
+ ownerUid:
+  parkingData?.ownerUid,
 
-  ownerEmail:
-    parkingData?.ownerEmail,
+ownerName:
+  parkingData?.ownerName,
 
-  parkingTitle:
-    parkingData?.title,
+ownerEmail:
+  parkingData?.ownerEmail,
+
+ownerPhone:
+  parkingData?.ownerPhone,
+
+ownerPhoto:
+  parkingData?.ownerPhoto,
+
+
+
+parkingTitle:
+  parkingData?.title,
+
+  parkingId: parkingDoc.id,
+
+  
+
+parkingImage:
+  parkingData?.image,
+
+parkingLocation:
+  parkingData?.location,
+
+parkingType:
+  parkingData?.parkingType,
+
+monthlyPrice:
+  Number(parkingData?.monthlyPrice),
+
+yearlyPrice:
+  Number(parkingData?.yearlyPrice),
 
   plan,
 
@@ -259,6 +389,8 @@ customerPhone:
   vehicleModel,
 
   vehicleColor,
+  vehicleImage:
+  vehicleImageUrl,
 
   bookingStatus:
     "Pending Approval",
@@ -280,9 +412,9 @@ customerPhone:
       const options = {
   key: "rzp_test_Su5POE7a3UsqZv",
 amount:
-  plan === "Monthly"
-    ? 300000
-    : 3000000,
+  (plan === "Monthly"
+    ? Number(parkingData?.monthlyPrice)
+    : Number(parkingData?.yearlyPrice)) * 100,
   currency: "INR",
   name: "CarParking Bangalore",
   description: "Parking Booking Payment",

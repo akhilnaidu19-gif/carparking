@@ -10,8 +10,10 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   orderBy,
   updateDoc,
+  increment,
 } from "firebase/firestore";
 
 import {
@@ -250,22 +252,47 @@ if (
 
   // STATS
 
-  const totalSlots =
-    parkings.length;
+const totalSlots =
+  parkings.reduce(
 
-  const occupiedSlots =
-    parkings.filter(
-      (item) =>
-        item.availability ===
-        "Occupied"
-    ).length;
+    (total, parking) =>
 
-  const availableSlots =
-    parkings.filter(
-      (item) =>
-        item.availability ===
-        "Available"
-    ).length;
+      total +
+      Number(
+        parking.totalSlots || 0
+      ),
+
+    0
+
+  );
+
+const occupiedSlots =
+  parkings.reduce(
+
+    (total, parking) =>
+
+      total +
+      Number(
+        parking.occupiedSlots || 0
+      ),
+
+    0
+
+  );
+
+const availableSlots =
+  parkings.reduce(
+
+    (total, parking) =>
+
+      total +
+      Number(
+        parking.availableSlots || 0
+      ),
+
+    0
+
+  );
 
   const activeBookings =
     bookings.filter(
@@ -1307,23 +1334,60 @@ const visibleBookings =
     <button
       onClick={async () => {
 
-        await updateDoc(
-          doc(
-            db,
-            "bookings",
-            booking.id
-          ),
-          {
-            bookingStatus:
-              "Approved",
-          }
-        );
+  try {
 
-        alert(
-          "Booking Approved"
-        );
+  const parkingRef = doc(
+    db,
+    "parkings",
+    booking.parkingId
+  );
 
-      }}
+  const parkingSnap = await getDoc(parkingRef);
+
+  if (!parkingSnap.exists()) {
+    alert("Parking not found");
+    return;
+  }
+
+  const parking = parkingSnap.data();
+
+  if (Number(parking.availableSlots) <= 0) {
+    alert("No parking slots available.");
+    return;
+  }
+
+  // Approve booking
+  await updateDoc(
+    doc(db, "bookings", booking.id),
+    {
+      bookingStatus: "Approved",
+    }
+  );
+
+  // Update slot counts
+  await updateDoc(
+    parkingRef,
+    {
+      occupiedSlots: increment(1),
+      availableSlots: increment(-1),
+      availability:
+        Number(parking.availableSlots) === 1
+          ? "Occupied"
+          : "Available",
+    }
+  );
+
+  alert("Booking Approved");
+
+} catch (error) {
+
+  console.log(error);
+
+  alert("Failed to approve booking");
+
+}
+
+}}
       className="bg-green-700 text-white px-6 py-3 rounded-2xl font-bold"
     >
       ✅ Approve Booking

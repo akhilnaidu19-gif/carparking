@@ -1007,15 +1007,19 @@ backgroundImage:
     </span>
   )}
 
-  <span
-    className={`text-xs px-3 py-1 rounded-full text-white font-semibold ${
-      spot.availability === "Available"
-        ? "bg-green-500"
-        : "bg-red-500"
-    }`}
-  >
-    {spot.availability}
-  </span>
+<span
+  className={`text-xs px-3 py-1 rounded-full text-white font-semibold ${
+    Number(spot.availableSlots) > 0
+      ? "bg-green-500"
+      : "bg-red-500"
+  }`}
+>
+
+  {Number(spot.availableSlots) > 0
+    ? "Available"
+    : "Fully Occupied"}
+
+</span>
 
 </div>
 
@@ -1151,18 +1155,63 @@ backgroundImage:
 
 </div>
 
+{/* SLOT STATUS */}
+
+<div className="bg-blue-50 rounded-2xl p-3 mb-4">
+
+  <div className="flex justify-between items-center">
+
+    <div>
+
+      <p className="text-xs text-gray-500">
+        Available Slots
+      </p>
+
+      <p className="font-bold text-green-600 text-lg">
+        {spot.availableSlots} / {spot.totalSlots}
+      </p>
+
+    </div>
+
+    <div className="text-right">
+
+      <p className="text-xs text-gray-500">
+        Occupied
+      </p>
+
+      <p className="font-bold text-red-600">
+        {spot.occupiedSlots}
+      </p>
+
+    </div>
+
+  </div>
+
+</div>
+
                       {/* BUTTONS */}
 
                       <div className="flex gap-3">
 
-                        <Link
-                          href={`/parking/${spot.id}`}
-                          className="flex-1 text-center bg-green-500 text-white py-3 rounded-2xl font-bold"
-                        >
+                        {Number(spot.availableSlots) > 0 ? (
 
-                          Book Now
+  <Link
+    href={`/parking/${spot.id}`}
+    className="flex-1 text-center bg-green-500 text-white py-3 rounded-2xl font-bold"
+  >
+    Book Now
+  </Link>
 
-                        </Link>
+) : (
+
+  <button
+    disabled
+    className="flex-1 bg-gray-400 text-white py-3 rounded-2xl font-bold cursor-not-allowed"
+  >
+    Fully Occupied
+  </button>
+
+)}
 
 <Link
   href={`/parking/${spot.id}`}

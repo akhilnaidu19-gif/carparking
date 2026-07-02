@@ -39,6 +39,9 @@ export default function AddParkingPage() {
   const [yearlyPrice, setYearlyPrice] =
     useState("");
 
+    const [totalSlots, setTotalSlots] =
+  useState("1");
+
   const [parkingType, setParkingType] =
     useState("Covered Parking");
 
@@ -244,6 +247,19 @@ export default function AddParkingPage() {
             }
             className="border p-4 rounded-2xl"
           />
+
+          {/* TOTAL PARKING SLOTS */}
+
+<input
+  type="number"
+  min="1"
+  placeholder="Total Parking Slots"
+  value={totalSlots}
+  onChange={(e) =>
+    setTotalSlots(e.target.value)
+  }
+  className="border p-4 rounded-2xl"
+/>
 
           {/* TYPE */}
 
@@ -484,6 +500,13 @@ export default function AddParkingPage() {
                 monthlyPrice,
 
                 yearlyPrice,
+                totalSlots:
+  Number(totalSlots),
+
+occupiedSlots: 0,
+
+availableSlots:
+  Number(totalSlots),
 
                 description,
 
@@ -558,6 +581,7 @@ export default function AddParkingPage() {
               setMonthlyPrice("");
 
               setYearlyPrice("");
+              setTotalSlots("1");
 
               setDescription("");
 

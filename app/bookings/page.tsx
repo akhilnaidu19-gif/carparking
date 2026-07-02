@@ -315,10 +315,10 @@ const expiredBookings =
 <div className="relative">
 
 
-    {booking.image ? (
+    {booking.parkingImage ? (
 
   <img
-    src={booking.image}
+    src={booking.parkingImage}
 alt={booking.parkingTitle}
     className="w-full h-48 object-cover"
   />
@@ -383,17 +383,27 @@ alt={booking.parkingTitle}
 
   <img
     src={
-      booking.ownerPhoto ||
-      "https://via.placeholder.com/100"
-    }
+  booking.ownerPhoto ||
+  "/default-user.png"
+}
     className="w-20 h-20 rounded-full object-cover"
   />
 
   <div>
 
     <h3 className="text-2xl font-bold">
-      {booking.owner || "Owner"}
+      {booking.ownerName || "Owner"}
     </h3>
+
+    {booking.vehicleImage && (
+
+  <img
+    src={booking.vehicleImage}
+    alt="Vehicle"
+    className="w-full h-40 object-cover rounded-xl mb-4"
+  />
+
+)}
 
     <p className="text-gray-500">
       Parking Owner
@@ -535,7 +545,8 @@ alt={booking.parkingTitle}
   }}
 value={JSON.stringify({
   bookingId: booking.id,
-  parking: booking.title,
+  parking:
+  booking.parkingTitle,
   customer: booking.customerName,
   validTill: booking.validTill,
 })}
@@ -560,7 +571,7 @@ value={JSON.stringify({
     booking.longitude
       ? `https://www.google.com/maps?q=${booking.latitude},${booking.longitude}`
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          booking.location
+          booking.parkingLocation
         )}`
   }
   target="_blank"
@@ -571,11 +582,11 @@ value={JSON.stringify({
 
 <a
   href={`https://wa.me/91${booking.ownerPhone}?text=${encodeURIComponent(
-    `Hello ${booking.owner},
+    `Hello ${booking.ownerName},
 
 I booked your parking space:
 
-${booking.title}
+${booking.parkingTitle}
 
 Booking ID: ${booking.bookingId}
 
@@ -721,7 +732,7 @@ Please share further details.`
                     "Booking Renewed",
 
                   message:
-  `${booking.customerName} renewed ${booking.title}`,
+  `${booking.customerName} renewed ${booking.parkingTitle}`,
 
                   createdAt:
                     new Date(),
