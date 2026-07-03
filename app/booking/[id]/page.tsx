@@ -6,14 +6,15 @@ import {
 } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  collection,
-  addDoc,
   doc,
   getDoc,
-  getDocs,
+  updateDoc,
+  collection,
   query,
   where,
-  updateDoc
+  getDocs,
+  addDoc,
+  increment,
 } from "firebase/firestore";
 import {
   db,
@@ -336,15 +337,7 @@ if (alreadyBooked) {
 
 
 
-if (!existingBooking.empty) {
 
-  alert(
-    "You have already booked this parking. Please wait for owner approval."
-  );
-
-  return;
-
-}
 
 // CHECK WHETHER SOMEONE ELSE HAS ALREADY BOOKED THIS SLOT
 
@@ -384,15 +377,7 @@ if (activeBooking) {
 
 
 
-if (!occupiedBooking.empty) {
 
-  alert(
-    "This parking has already been booked and is waiting for owner approval."
-  );
-
-  return;
-
-}
 
   // CHECK SLOT AVAILABILITY
 
@@ -461,8 +446,12 @@ const latestParkingDoc =
 
   );
 
-const latestParking =
-  latestParkingDoc.data();
+const latestParking = latestParkingDoc.data();
+
+if (!latestParking) {
+  alert("Parking data not found");
+  return;
+}
 
 if (
   Number(
@@ -616,7 +605,10 @@ amount:
 
   handler: async function () {
 
+    console.log("PAYMENT SUCCESS HANDLER CALLED");
+
   try {
+    
 
     await addDoc(
       collection(db, "bookings"),
@@ -624,23 +616,15 @@ amount:
     );
 
     await updateDoc(
-
-  doc(
-    db,
-    "parkings",
-    parkingDoc.id
-  ),
-
+  doc(db, "parkings", parkingDoc.id),
   {
-
-    availableSlots: 0,
-
-    occupiedSlots: 1,
-
-    availability: "Occupied"
-
+    availableSlots: increment(-1),
+    occupiedSlots: increment(1),
+    availability:
+      Number(latestParking.availableSlots) === 1
+        ? "Occupied"
+        : "Available",
   }
-
 );
 
     alert("Payment Successful");

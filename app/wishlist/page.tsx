@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { app } from "@/lib/firebase";
 
 import {
   collection,
@@ -15,8 +18,34 @@ import { db } from "@/lib/firebase";
 
 export default function WishlistPage() {
 
+  const router = useRouter();
+
+const auth = getAuth(app);
+
+const [loading, setLoading] = useState(true);
+
   const [items, setItems] =
     useState<any[]>([]);
+
+    useEffect(() => {
+
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+
+    if (!user) {
+
+      router.replace("/login");
+
+      return;
+
+    }
+
+    setLoading(false);
+
+  });
+
+  return () => unsubscribe();
+
+}, [auth, router]);
 
   useEffect(() => {
 
@@ -110,6 +139,22 @@ export default function WishlistPage() {
     }
 
   };
+
+  if (loading) {
+
+  return (
+
+    <div className="min-h-screen flex items-center justify-center">
+
+      <h1 className="text-3xl font-bold">
+        Loading...
+      </h1>
+
+    </div>
+
+  );
+
+}
 
 return (
 

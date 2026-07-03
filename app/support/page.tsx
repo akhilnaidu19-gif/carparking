@@ -1,5 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
+import {
+  getAuth,
+  onAuthStateChanged,
+} from "firebase/auth";
+
+import { app } from "@/lib/firebase";
+
 import { useEffect, useState } from "react";
 import {
   addDoc,
@@ -10,7 +19,33 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+
+
 export default function SupportPage() {
+  const router = useRouter();
+
+const auth = getAuth(app);
+
+const [pageLoading, setPageLoading] = useState(true);
+useEffect(() => {
+
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+
+    if (!user) {
+
+      router.replace("/login");
+
+      return;
+
+    }
+
+    setPageLoading(false);
+
+  });
+
+  return () => unsubscribe();
+
+}, [auth, router]);
 const [subject, setSubject] = useState("");
 const [message, setMessage] = useState("");
 
@@ -22,6 +57,10 @@ const [loading, setLoading] = useState(false);
 
   const loadTickets = async () => {
     const email = localStorage.getItem("userEmail");
+
+
+
+
 
     if (!email) return;
 
@@ -147,6 +186,24 @@ setCategory("");
         return "bg-gray-500";
     }
   };
+
+if (pageLoading) {
+
+  return (
+
+    <div className="min-h-screen flex items-center justify-center">
+
+      <h1 className="text-3xl font-bold">
+
+        Loading...
+
+      </h1>
+
+    </div>
+
+  );
+
+}
 
   return (
     <div className="min-h-screen bg-gray-100 p-10">

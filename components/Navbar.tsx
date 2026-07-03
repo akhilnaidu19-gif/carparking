@@ -29,9 +29,28 @@ useEffect(() => {
   const unsubscribe =
     onAuthStateChanged(auth, (currentUser) => {setUser(currentUser);
 
-setUserPhoto(
-  localStorage.getItem("userPhoto") || ""
-);
+const loadUserPhoto = async () => {
+
+  if (!currentUser) return;
+
+  const q = query(
+    collection(db, "users"),
+    where("uid", "==", currentUser.uid)
+  );
+
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+
+    const data = snapshot.docs[0].data();
+
+    setUserPhoto(data.photo || "");
+
+  }
+
+};
+
+loadUserPhoto();
 
 const loadOwnerStatus = async () => {
 

@@ -23,6 +23,8 @@ import {
 
 import { app, db } from "@/lib/firebase";
 
+import { useRouter } from "next/navigation";
+
 export default function DashboardPage() {
 
   const [parkings, setParkings] =
@@ -54,27 +56,52 @@ const [
     useState(true);
 
   const auth = getAuth(app);
+  const router = useRouter();
 
   // AUTH
 
   useEffect(() => {
 
-    const unsubscribe =
-      onAuthStateChanged(
+  const unsubscribe = onAuthStateChanged(
 
-        auth,
+    auth,
 
-        (currentUser) => {
+    async (currentUser) => {
 
-          setUser(currentUser);
+      if (!currentUser) {
 
-        }
+        router.replace("/login");
+        return;
 
-      );
+      }
 
-    return () => unsubscribe();
+      const q = query(
+  collection(db, "ownerApplications"),
+  where("userUid", "==", currentUser.uid),
+  where("status", "==", "Approved")
+);
 
-  }, []);
+const snapshot = await getDocs(q);
+
+if (snapshot.empty) {
+
+  alert("You are not registered as a Parking Owner.");
+
+  router.replace("/");
+
+  return;
+
+}
+
+      setUser(currentUser);
+
+    }
+
+  );
+
+  return () => unsubscribe();
+
+}, []);
 
   // FETCH OWNER PARKINGS
 
@@ -124,66 +151,40 @@ where(
 
           // FETCH BOOKINGS
 
-          const bookingsSnapshot =
-            await getDocs(
-              collection(
-                db,
-                "bookings"
-              )
-            );
+          const bookingsSnapshot = await getDocs(
+  collection(db, "bookings")
+);
 
-          const bookingData: any[] =
-            [];
+const bookingData: any[] = [];
+let total = 0;
 
-          let total = 0;
+const ownerUids = parkingData.map(
+  (parking) => parking.ownerUid
+);
 
-          bookingsSnapshot.forEach(
-            (doc) => {
+bookingsSnapshot.forEach((bookingDoc) => {
 
-              const data =
-                doc.data();
-
-             const ownerUids =
-  parkingData.map(
-    (item) =>
-      item.ownerUid
-  );
-
-bookingsSnapshot.forEach((doc) => {
-
-  const data = doc.data();
-
-  const ownerUids = parkingData.map(
-    (item) => item.ownerUid
-  );
+  const data = bookingDoc.data();
 
   if (ownerUids.includes(data.ownerUid)) {
 
     bookingData.push({
-      id: doc.id,
+      id: bookingDoc.id,
       ...data,
     });
 
     if (data.bookingStatus === "Completed") {
-
       total += Number(
         data.ownerReceivableAmount || 0
       );
-
     }
 
   }
 
 });
 
-            }
-          );
-
-          setBookings(
-            bookingData
-          );
-
-          setEarnings(total);
+setBookings(bookingData);
+setEarnings(total);
 
           setLoading(false);
 
@@ -466,6 +467,24 @@ const visibleBookings =
     );
 
   });
+
+  if (loading) {
+
+  return (
+
+    <div className="min-h-screen flex items-center justify-center">
+
+      <h1 className="text-3xl font-bold">
+
+        Loading...
+
+      </h1>
+
+    </div>
+
+  );
+
+}
 
   if (!user) {
 
@@ -1395,10 +1414,7 @@ const visibleBookings =
 
   const parking = parkingSnap.data();
 
-  if (Number(parking.availableSlots) <= 0) {
-    alert("No parking slots available.");
-    return;
-  }
+
 
   // Approve booking
 await updateDoc(
@@ -1412,16 +1428,15 @@ await updateDoc(
 
   // Update slot counts
   await updateDoc(
-    parkingRef,
-    {
-      occupiedSlots: increment(1),
-      availableSlots: increment(-1),
-      availability:
-        Number(parking.availableSlots) === 1
-          ? "Occupied"
-          : "Available",
-    }
-  );
+  doc(db, "bookings", booking.id),
+  {
+    bookingStatus: "Approved",
+    ownerApprovalStatus: "Approved",
+    approvedDate: new Date(),
+  }
+);
+
+alert("Booking Approved");
 
   alert("Booking Approved");
 
@@ -1459,14 +1474,11 @@ await updateDoc(
       }
     );
 
-    await updateDoc(
-      parkingRef,
-      {
-        availableSlots: 1,
-        occupiedSlots: 0,
-        availability: "Available",
-      }
-    );
+await updateDoc(parkingRef,{
+availableSlots: increment(1),
+occupiedSlots: increment(-1),
+availability: "Available"
+});
 
     alert("Booking Rejected");
 
@@ -1488,63 +1500,7 @@ await updateDoc(
 
 )}
 
-{booking.bookingStatus === "Approved" && (
 
-  <button
-    onClick={async () => {
-
-      try {
-
-const parkingRef = doc(
-  db,
-  "parkings",
-  booking.parkingId
-);
-
-const parkingSnap = await getDoc(parkingRef);
-
-if (!parkingSnap.exists()) {
-  alert("Parking not found");
-  return;
-}
-
-await updateDoc(
-  doc(db, "bookings", booking.id),
-  {
-bookingStatus: "Completed",
-paymentStatus: "Ready For Payout",
-completedDate: new Date(),
-  }
-);
-
-await updateDoc(
-  parkingRef,
-  {
-    occupiedSlots: increment(-1),
-    availableSlots: increment(1),
-    availability: "Available",
-  }
-);
-
-alert("Booking Completed");
-
-        alert("Booking marked as Completed");
-
-      } catch (error) {
-
-        console.log(error);
-
-        alert("Unable to update booking");
-
-      }
-
-    }}
-    className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold"
-  >
-    ✅ Mark as Completed
-  </button>
-
-)}
 
 </div>
 

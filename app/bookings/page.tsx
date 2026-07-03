@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import Script from "next/script";
 import { QRCodeCanvas } from "qrcode.react";
 import { useRef } from "react";
+import { useRouter } from "next/navigation";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { app } from "@/lib/firebase";
 
 import {
   collection,
@@ -19,6 +22,11 @@ import { db } from "@/lib/firebase";
 
 
 export default function BookingsPage() {
+  const router = useRouter();
+
+const auth = getAuth(app);
+
+const [loading, setLoading] = useState(true);
 
   const isExpired = (
   validTill: string
@@ -227,7 +235,44 @@ const expiredBookings =
 
   }, []);
 
- return (
+ useEffect(() => {
+
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+
+    if (!user) {
+
+      router.replace("/login");
+
+      return;
+
+    }
+
+    setLoading(false);
+
+  });
+
+  return () => unsubscribe();
+
+}, [auth, router]);
+
+// ADD THIS BLOCK
+if (loading) {
+
+  return (
+
+    <div className="min-h-screen flex items-center justify-center">
+
+      <h1 className="text-3xl font-bold">
+        Loading...
+      </h1>
+
+    </div>
+
+  );
+
+}
+
+return (
 
   <>
 
@@ -395,15 +440,7 @@ alt={booking.parkingTitle}
       {booking.ownerName || "Owner"}
     </h3>
 
-    {booking.vehicleImage && (
-
-  <img
-    src={booking.vehicleImage}
-    alt="Vehicle"
-    className="w-full h-40 object-cover rounded-xl mb-4"
-  />
-
-)}
+    
 
     <p className="text-gray-500">
       Parking Owner
@@ -416,6 +453,69 @@ alt={booking.parkingTitle}
     <p className="text-blue-600">
       ✉️ {booking.ownerEmail || "Email Not Available"}
     </p>
+
+  </div>
+
+</div>
+
+{/* VEHICLE DETAILS */}
+
+<div className="bg-gray-100 rounded-3xl p-6 mb-8">
+
+  <h3 className="text-2xl font-bold mb-5">
+    🚗 Your Vehicle
+  </h3>
+
+  <div className="grid md:grid-cols-2 gap-6">
+
+    {booking.vehicleImage && (
+
+      <img
+        src={booking.vehicleImage}
+        alt="Vehicle"
+        className="w-full h-56 object-cover rounded-2xl"
+      />
+
+    )}
+
+    <div className="space-y-3">
+
+      <p>
+        <span className="font-bold">
+          Vehicle Number:
+        </span>{" "}
+        {booking.vehicleNumber}
+      </p>
+
+      <p>
+        <span className="font-bold">
+          Vehicle Type:
+        </span>{" "}
+        {booking.vehicleType}
+      </p>
+
+      <p>
+        <span className="font-bold">
+          Brand:
+        </span>{" "}
+        {booking.vehicleBrand}
+      </p>
+
+      <p>
+        <span className="font-bold">
+          Model:
+        </span>{" "}
+        {booking.vehicleModel}
+      </p>
+
+      <p>
+        <span className="font-bold">
+          Color:
+        </span>{" "}
+        {booking.vehicleColor}
+      </p>
+
+    </div>
 
   </div>
 

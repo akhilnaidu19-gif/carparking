@@ -669,8 +669,8 @@ availableSlots:
                 ownerEmail:
                   userData?.email || "",
 
-                ownerPhoto:
-                  userData?.photoURL || "",
+ownerPhoto:
+  userData?.photo || "",
 
                 ownerPhone:
                   userData?.phone || "",
