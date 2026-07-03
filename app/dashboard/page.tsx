@@ -149,27 +149,32 @@ where(
       item.ownerUid
   );
 
-if (
-  ownerUids.includes(
-    data.ownerUid
-  )
-)
-{
+bookingsSnapshot.forEach((doc) => {
 
-                bookingData.push({
+  const data = doc.data();
 
-                  id: doc.id,
+  const ownerUids = parkingData.map(
+    (item) => item.ownerUid
+  );
 
-                  ...data,
+  if (ownerUids.includes(data.ownerUid)) {
 
-                });
+    bookingData.push({
+      id: doc.id,
+      ...data,
+    });
 
-                total +=
-                  Number(
-                    data.amount || 0
-                  );
+    if (data.bookingStatus === "Completed") {
 
-              }
+      total += Number(
+        data.ownerReceivableAmount || 0
+      );
+
+    }
+
+  }
+
+});
 
             }
           );
@@ -383,6 +388,46 @@ const rejectedBookings =
       "Rejected"
   );
 
+  const pendingPayout = bookings.reduce(
+  (total, booking) => {
+
+    if (
+      booking.ownerPayoutStatus === "Pending"
+    ) {
+      return (
+        total +
+        Number(
+          booking.ownerReceivableAmount || 0
+        )
+      );
+    }
+
+    return total;
+
+  },
+  0
+);
+
+const paidPayout = bookings.reduce(
+  (total, booking) => {
+
+    if (
+      booking.ownerPayoutStatus === "Paid"
+    ) {
+      return (
+        total +
+        Number(
+          booking.ownerReceivableAmount || 0
+        )
+      );
+    }
+
+    return total;
+
+  },
+  0
+);
+
 const visibleBookings =
   bookings.filter(
     (booking) =>
@@ -568,7 +613,7 @@ const visibleBookings =
     Business Analytics
   </h2>
 
-  <div className="grid md:grid-cols-2 gap-6">
+<div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
 
     <div className="bg-green-100 p-6 rounded-3xl">
 
@@ -595,6 +640,30 @@ const visibleBookings =
     </div>
 
   </div>
+
+  <div className="bg-yellow-100 p-6 rounded-3xl">
+
+  <p className="text-gray-600 mb-2">
+    Pending Payout
+  </p>
+
+  <h2 className="text-5xl font-bold text-yellow-600">
+    ₹{pendingPayout}
+  </h2>
+
+</div>
+
+<div className="bg-blue-100 p-6 rounded-3xl">
+
+  <p className="text-gray-600 mb-2">
+    Total Paid
+  </p>
+
+  <h2 className="text-5xl font-bold text-blue-600">
+    ₹{paidPayout}
+  </h2>
+
+</div>
 
 </div>
 
@@ -699,7 +768,7 @@ const visibleBookings =
         (booking) => (
 
           <div
-            key={booking.bookingId}
+            key={booking.id}
             className="border rounded-2xl p-4"
           >
 
@@ -934,66 +1003,41 @@ const visibleBookings =
 
                     <div className="flex flex-wrap gap-4">
 
-                      <a
-                        href={
-                          parking.latitude &&
-                          parking.longitude
-                            ? `https://www.google.com/maps?q=${parking.latitude},${parking.longitude}`
-                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                                parking.location
-                              )}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-black text-white px-6 py-4 rounded-2xl font-bold"
-                      >
+  <a
+    href={`/owner/edit-listing/${parking.id}`}
+    className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-bold"
+  >
+    ✏️ Edit Listing
+  </a>
 
-                        View Map
+  <a
+    href={`/parking/${parking.id}`}
+    className="bg-green-600 text-white px-6 py-4 rounded-2xl font-bold"
+  >
+    👁 Preview
+  </a>
 
-                      </a>
+  <a
+    href={
+      parking.latitude && parking.longitude
+        ? `https://www.google.com/maps?q=${parking.latitude},${parking.longitude}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+            parking.location
+          )}`
+    }
+    target="_blank"
+    className="bg-black text-white px-6 py-4 rounded-2xl font-bold"
+  >
+    🗺 View Map
+  </a>
 
-                      <button
-                        onClick={async () => {
+  <button
+    className="bg-red-500 text-white px-6 py-4 rounded-2xl font-bold"
+  >
+    🗑 Delete
+  </button>
 
-                          const confirmDelete =
-                            confirm(
-                              "Delete parking?"
-                            );
-
-                          if (
-                            !confirmDelete
-                          )
-                            return;
-
-                          try {
-
-                            await deleteDoc(
-                              doc(
-                                db,
-                                "parkings",
-                                parking.id
-                              )
-                            );
-
-                            alert(
-                              "Parking Deleted"
-                            );
-
-                          } catch (error) {
-
-                            console.log(error);
-
-                          }
-
-                        }}
-                        className="bg-red-500 text-white px-6 py-4 rounded-2xl font-bold"
-                      >
-
-                        Delete Listing
-
-                      </button>
-
-                    </div>
+</div>
 
                   </div>
 
@@ -1122,7 +1166,7 @@ const visibleBookings =
               {visibleBookings.map((booking) => (
 
                 <div
-                  key={booking.bookingId}
+                  key={booking.id}
                   className="border rounded-3xl p-6 flex flex-col lg:flex-row gap-8 bg-gray-50"
                 >
 
@@ -1299,11 +1343,11 @@ const visibleBookings =
 
                         </p>
 
-                        <h3 className="text-2xl font-bold text-green-600">
+<h3 className="text-2xl font-bold text-green-600">
 
-                          ₹{booking.amount}
+  ₹{booking.ownerReceivableAmount || 0}
 
-                        </h3>
+</h3>
 
                       </div>
 
@@ -1357,12 +1401,14 @@ const visibleBookings =
   }
 
   // Approve booking
-  await updateDoc(
-    doc(db, "bookings", booking.id),
-    {
-      bookingStatus: "Approved",
-    }
-  );
+await updateDoc(
+  doc(db, "bookings", booking.id),
+  {
+    bookingStatus: "Approved",
+    ownerApprovalStatus: "Approved",
+    approvedDate: new Date(),
+  }
+);
 
   // Update slot counts
   await updateDoc(
@@ -1396,32 +1442,107 @@ const visibleBookings =
     <button
       onClick={async () => {
 
-        await updateDoc(
-          doc(
-            db,
-            "bookings",
-            booking.id
-          ),
-          {
-            bookingStatus:
-              "Rejected",
+  try {
 
-            paymentStatus:
-              "Refund Pending",
-          }
-        );
+    const parkingRef = doc(
+      db,
+      "parkings",
+      booking.parkingId
+    );
 
-        alert(
-          "Booking Rejected"
-        );
+    await updateDoc(
+      doc(db, "bookings", booking.id),
+      {
+        bookingStatus: "Rejected",
+        ownerApprovalStatus: "Rejected",
+        paymentStatus: "Refund Pending",
+      }
+    );
 
-      }}
+    await updateDoc(
+      parkingRef,
+      {
+        availableSlots: 1,
+        occupiedSlots: 0,
+        availability: "Available",
+      }
+    );
+
+    alert("Booking Rejected");
+
+  } catch (error) {
+
+    console.log(error);
+
+    alert("Unable to reject booking");
+
+  }
+
+}}
       className="bg-red-600 text-white px-6 py-3 rounded-2xl font-bold"
     >
       ❌ Reject Booking
     </button>
 
   </>
+
+)}
+
+{booking.bookingStatus === "Approved" && (
+
+  <button
+    onClick={async () => {
+
+      try {
+
+const parkingRef = doc(
+  db,
+  "parkings",
+  booking.parkingId
+);
+
+const parkingSnap = await getDoc(parkingRef);
+
+if (!parkingSnap.exists()) {
+  alert("Parking not found");
+  return;
+}
+
+await updateDoc(
+  doc(db, "bookings", booking.id),
+  {
+bookingStatus: "Completed",
+paymentStatus: "Ready For Payout",
+completedDate: new Date(),
+  }
+);
+
+await updateDoc(
+  parkingRef,
+  {
+    occupiedSlots: increment(-1),
+    availableSlots: increment(1),
+    availability: "Available",
+  }
+);
+
+alert("Booking Completed");
+
+        alert("Booking marked as Completed");
+
+      } catch (error) {
+
+        console.log(error);
+
+        alert("Unable to update booking");
+
+      }
+
+    }}
+    className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold"
+  >
+    ✅ Mark as Completed
+  </button>
 
 )}
 

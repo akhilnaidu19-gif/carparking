@@ -1,6 +1,73 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+} from "firebase/firestore";
+
+import { app, db } from "@/lib/firebase";
 
 export default function Footer() {
+  const auth = getAuth(app);
+
+const [user, setUser] = useState<any>(null);
+
+const [ownerStatus, setOwnerStatus] =
+  useState("");
+  useEffect(() => {
+
+  const unsubscribe =
+    onAuthStateChanged(auth, (currentUser) => {
+
+      setUser(currentUser);
+
+    });
+
+  return () => unsubscribe();
+
+}, []);
+useEffect(() => {
+
+  if (!user) return;
+
+  const q = query(
+
+    collection(db, "ownerApplications"),
+
+    where(
+      "userEmail",
+      "==",
+      user.email
+    )
+
+  );
+
+  const unsubscribe =
+    onSnapshot(q, (snapshot) => {
+
+      if (snapshot.empty) {
+
+        setOwnerStatus("NotOwner");
+
+      } else {
+
+        setOwnerStatus(
+          snapshot.docs[0].data().status
+        );
+
+      }
+
+    });
+
+  return () => unsubscribe();
+
+}, [user]);
   return (
     <footer className="bg-black text-white py-12 px-6">
 
@@ -31,9 +98,23 @@ export default function Footer() {
               <Link href="/bookings">Bookings</Link>
             </li>
 
-            <li>
-              <Link href="/dashboard">Dashboard</Link>
-            </li>
+            {ownerStatus === "Approved" ? (
+
+<li>
+  <Link href="/dashboard">
+    Owner Dashboard
+  </Link>
+</li>
+
+) : (
+
+<li>
+  <Link href="/bookings">
+    My Bookings
+  </Link>
+</li>
+
+)}
 
             <li>
               <Link href="/wishlist">Wishlist</Link>

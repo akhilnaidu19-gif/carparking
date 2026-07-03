@@ -17,14 +17,25 @@ import {
   where,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { app, db } from "@/lib/firebase";
+
+import {
+  getAuth,
+  onAuthStateChanged,
+} from "firebase/auth";
+
 
 export default function ParkingDetailsPage() {
 
   const params = useParams();
 
+  const auth = getAuth(app);
+
   const [parking, setParking] =
     useState<any>(null);
+
+    const [user, setUser] =
+  useState<any>(null);
 
   const [reviews, setReviews] =
     useState<any[]>([]);
@@ -77,6 +88,25 @@ export default function ParkingDetailsPage() {
     fetchParking();
 
   }, []);
+
+  useEffect(() => {
+
+  const unsubscribe =
+    onAuthStateChanged(
+
+      auth,
+
+      (currentUser) => {
+
+        setUser(currentUser);
+
+      }
+
+    );
+
+  return () => unsubscribe();
+
+}, []);
 
   // FETCH REVIEWS
 
@@ -171,7 +201,10 @@ export default function ParkingDetailsPage() {
 
       : "0";
 
- 
+ const isOwner =
+  user &&
+  parking &&
+  parking.ownerUid === user.uid;
 
   return (
 
@@ -426,92 +459,96 @@ export default function ParkingDetailsPage() {
 
           {/* PLANS */}
 
-          <div className="grid md:grid-cols-2 gap-6 mb-10">
+{isOwner ? (
 
-            {/* MONTHLY */}
+  <div className="bg-blue-50 border-2 border-blue-500 rounded-3xl p-10 mb-10 text-center">
 
-            <div className="bg-white p-8 rounded-3xl shadow-lg">
+    <h2 className="text-3xl font-bold text-blue-700 mb-4">
+      🏠 This is Your Parking Listing
+    </h2>
 
-              <h2 className="text-2xl font-bold mb-4">
+    <p className="text-gray-600 text-lg mb-8">
+      You cannot book your own parking.
+      Use the Owner Dashboard to edit your listing,
+      manage bookings, and update parking details.
+    </p>
 
-                Monthly Plan
+    <button
+      onClick={() =>
+        window.location.href = "/owner-dashboard"
+      }
+      className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-2xl font-bold"
+    >
+      Edit Listing
+    </button>
 
-              </h2>
+  </div>
 
-              <p className="text-4xl font-bold text-green-600 mb-4">
+) : (
 
-                ₹
-                {
-                  parking.monthlyPrice
-                }
-                /month
+<div className="grid md:grid-cols-2 gap-6 mb-10">
 
-              </p>
+  {/* Monthly */}
 
-              <button
+  <div className="bg-white p-8 rounded-3xl shadow-lg">
 
-                onClick={() =>
-  window.location.href =
-    `/booking/${parking.id}?plan=Monthly`
-}
+    <h2 className="text-2xl font-bold mb-4">
+      Monthly Plan
+    </h2>
 
-              disabled={
-  Number(parking.availableSlots) <= 0
-}
+    <p className="text-4xl font-bold text-green-600 mb-4">
+      ₹{parking.monthlyPrice}/month
+    </p>
 
-                className="w-full bg-green-500 text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
+    <button
+      onClick={() =>
+        window.location.href =
+          `/booking/${parking.id}?plan=Monthly`
+      }
+      disabled={
+        Number(parking.availableSlots) <= 0
+      }
+      className="w-full bg-green-500 text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
+    >
+      {Number(parking.availableSlots) <= 0
+        ? "Fully Occupied"
+        : "Book Monthly"}
+    </button>
 
-              >
+  </div>
 
-                {Number(parking.availableSlots) <= 0
-  ? "Fully Occupied"
-  : "Book Monthly"}
+  {/* Yearly */}
 
-              </button>
+  <div className="bg-white p-8 rounded-3xl shadow-lg">
 
-            </div>
+    <h2 className="text-2xl font-bold mb-4">
+      Yearly Plan
+    </h2>
 
-            {/* YEARLY */}
+    <p className="text-4xl font-bold text-black mb-4">
+      ₹30000/year
+    </p>
 
-            <div className="bg-white p-8 rounded-3xl shadow-lg">
+    <button
+      onClick={() =>
+        window.location.href =
+          `/booking/${parking.id}?plan=Yearly`
+      }
+      disabled={
+        Number(parking.availableSlots) <= 0
+      }
+      className="w-full bg-black text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
+    >
+      {Number(parking.availableSlots) <= 0
+        ? "Fully Occupied"
+        : "Book Yearly"}
+    </button>
 
-              <h2 className="text-2xl font-bold mb-4">
+  </div>
 
-                Yearly Plan
+</div>
 
-              </h2>
-
-              <p className="text-4xl font-bold text-black mb-4">
-
-                ₹30000/year
-
-              </p>
-
-              <button
-
-onClick={() =>
-  window.location.href =
-    `/booking/${parking.id}?plan=Yearly`
-}
-
-                disabled={
-  Number(parking.availableSlots) <= 0
-}
-
-                className="w-full bg-black text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
-
-              >
-
-                {Number(parking.availableSlots) <= 0
-  ? "Fully Occupied"
-
-                  : "Book Yearly"}
-
-              </button>
-
-            </div>
-
-          </div>
+)}
 
           {/* REVIEWS */}
 

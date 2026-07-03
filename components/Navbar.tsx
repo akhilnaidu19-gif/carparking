@@ -3,30 +3,65 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { app } from "@/lib/firebase";
+import { app, db } from "@/lib/firebase";
+
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 
 
 
 export default function Navbar() {
-  const [user, setUser] = useState<any>(null);
+const [user, setUser] = useState<any>(null);
 
-  const [userPhoto, setUserPhoto] =
-  useState("");
+const [userPhoto, setUserPhoto] = useState("");
+
+const [ownerStatus, setOwnerStatus] =
+useState("");
 
 const auth = getAuth(app);
 
 useEffect(() => {
 
   const unsubscribe =
-    onAuthStateChanged(auth, (currentUser) => {
-
-      setUser(currentUser);
+    onAuthStateChanged(auth, (currentUser) => {setUser(currentUser);
 
 setUserPhoto(
-  localStorage.getItem(
-    "userPhoto"
-  ) || ""
+  localStorage.getItem("userPhoto") || ""
 );
+
+const loadOwnerStatus = async () => {
+
+  if (!currentUser) {
+    setOwnerStatus("");
+    return;
+  }
+
+  const q = query(
+    collection(db, "ownerApplications"),
+    where("userEmail", "==", currentUser.email)
+  );
+
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+
+    setOwnerStatus("");
+
+  } else {
+
+    const data = snapshot.docs[0].data();
+
+    setOwnerStatus(data.status);
+
+  }
+
+};
+
+loadOwnerStatus();
 
     });
 
@@ -56,13 +91,51 @@ setUserPhoto(
           Search Parking
         </Link>
 
-        <Link href="/add-parking">
-          List Parking
-        </Link>
+       <Link href="/add-parking">
+  List Parking
+</Link>
 
-        <Link href="/bookings">
-          My Bookings
-        </Link>
+{user && ownerStatus === "" && (
+
+  <Link href="/become-owner">
+    Become Owner
+  </Link>
+
+)}
+
+{user && ownerStatus === "Pending" && (
+
+  <span className="text-yellow-400 cursor-default">
+    Application Pending
+  </span>
+
+)}
+
+{user && ownerStatus === "Approved" && (
+
+  <Link
+    href="/dashboard"
+    className="text-green-400 font-semibold"
+  >
+    Owner Dashboard
+  </Link>
+
+)}
+
+{user && ownerStatus === "Rejected" && (
+
+  <Link
+    href="/become-owner"
+    className="text-red-400"
+  >
+    Reapply
+  </Link>
+
+)}
+
+<Link href="/bookings">
+  My Bookings
+</Link>
 
         <Link href="/wishlist">
           Wishlist ❤️

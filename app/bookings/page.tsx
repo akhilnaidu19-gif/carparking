@@ -471,9 +471,9 @@ alt={booking.parkingTitle}
     Amount Paid
   </p>
 
-  <p className="font-bold text-green-600">
-    ₹{booking.amount || 0}
-  </p>
+<p className="font-bold text-green-600">
+  ₹{booking.customerPaidAmount || 0}
+</p>
 
 </div>
 
@@ -637,6 +637,7 @@ Please share further details.`
 </button>
 
 <button
+  disabled={booking.bookingStatus === "Completed"}
 
   onClick={async () => {
 
@@ -794,7 +795,11 @@ Please share further details.`
 
   }}
 
-  className="flex-1 bg-yellow-500 text-white py-4 rounded-2xl font-bold"
+  className={`flex-1 py-4 rounded-2xl font-bold text-white ${
+  booking.bookingStatus === "Completed"
+    ? "bg-gray-400 cursor-not-allowed"
+    : "bg-yellow-500 hover:bg-yellow-600"
+}`}
 
 >
 
@@ -802,56 +807,7 @@ Please share further details.`
 
 </button>
 
-{isExpired(
-  booking.validTill
-) && (
 
-  <button
-
-    onClick={async () => {
-
-      try {
-
-        await updateDoc(
-
-          doc(
-            db,
-            "parkings",
-            booking.parkingId
-          ),
-
-          {
-
-            availability:
-              "Available",
-
-          }
-
-        );
-
-        alert(
-          "Parking Released"
-        );
-
-        window.location.reload();
-
-      } catch (error) {
-
-        console.log(error);
-
-      }
-
-    }}
-
-    className="flex-1 bg-green-500 text-white py-4 rounded-2xl font-bold"
-
-  >
-
-    Release Parking
-
-  </button>
-
-)}
 
       <button
 

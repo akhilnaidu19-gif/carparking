@@ -1,9 +1,20 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useState } from "react";
-import { collection, addDoc,doc,
-getDoc } from "firebase/firestore";
+import {
+  useParams,
+  useRouter,
+} from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+  collection,
+  addDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  updateDoc
+} from "firebase/firestore";
 import {
   db,
   storage,
@@ -19,6 +30,7 @@ import {
 export default function BookingPage() {
 
   const params = useParams();
+  const router = useRouter();
   const searchParams =
   useSearchParams();
 
@@ -26,8 +38,7 @@ const plan =
   searchParams.get("plan") ||
   "Monthly";
 
-const [date, setDate] = useState("");
-const [time, setTime] = useState("");
+
 
 const [vehicleType, setVehicleType] =
   useState("Car");
@@ -50,6 +61,50 @@ const [vehicleColor, setVehicleColor] =
 const [uploading, setUploading] =
   useState(false);
 
+  const [parkingData, setParkingData] =
+  useState<any>(null);
+
+  const parkingAmount =
+  parkingData
+    ? plan === "Monthly"
+      ? Number(parkingData.monthlyPrice)
+      : Number(parkingData.yearlyPrice)
+    : 0;
+
+const platformFeePercent = 10;
+
+const platformFeeAmount = Math.round(
+  parkingAmount * (platformFeePercent / 100)
+);
+
+const customerPaidAmount =
+  parkingAmount + platformFeeAmount;
+
+const ownerReceivableAmount =
+  parkingAmount;
+
+  useEffect(() => {
+
+  const loadParking = async () => {
+
+    const parkingDoc = await getDoc(
+      doc(
+        db,
+        "parkings",
+        params.id as string
+      )
+    );
+
+    if (parkingDoc.exists()) {
+      setParkingData(parkingDoc.data());
+    }
+
+  };
+
+  loadParking();
+
+}, [params.id]);
+
   return (
     <>
   <Script src="https://checkout.razorpay.com/v1/checkout.js" />
@@ -61,58 +116,84 @@ const [uploading, setUploading] =
           Book Parking Slot
         </h1>
 
-        <p className="text-xl text-gray-600 mb-10">
-          Booking Parking ID: {params.id}
-        </p>
+<div className="mb-8">
 
-        <div className="bg-green-100 border border-green-400 p-4 rounded-2xl mb-8">
-
-  <h2 className="text-2xl font-bold text-green-700">
-
-    Selected Plan: {plan}
-
+  <h2 className="text-3xl font-bold">
+    {parkingData?.title}
   </h2>
 
-  <p className="text-gray-600">
-
-    {
-      plan === "Monthly"
-        ? "₹3000 / Month"
-        : "₹30000 / Year"
-    }
-
+  <p className="text-gray-500 text-lg mt-2">
+    📍 {parkingData?.location}
   </p>
 
 </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+       <div className="bg-white border border-green-300 rounded-2xl shadow-sm p-6 mb-8">
 
-          <div className="bg-green-100 p-4 rounded-2xl mb-6">
 
-  <h2 className="text-2xl font-bold">
-
-    Selected Plan:
-    {plan}
-
+  <h2 className="text-xl font-bold text-green-700 mb-5">
+    Payment Summary
   </h2>
+
+  <div className="flex justify-between mb-2">
+    <span>Parking Charges</span>
+    <span>
+      ₹{
+        plan === "Monthly"
+          ? parkingData?.monthlyPrice || 0
+          : parkingData?.yearlyPrice || 0
+      }
+    </span>
+  </div>
+
+  <div className="flex justify-between mb-2">
+    <span>Platform Fee (10%)</span>
+    <span>
+      ₹{
+        Math.round(
+          ((plan === "Monthly"
+            ? Number(parkingData?.monthlyPrice || 0)
+            : Number(parkingData?.yearlyPrice || 0)) * 10) / 100
+        )
+      }
+    </span>
+  </div>
+
+<hr className="my-4 border-green-300" />
+
+<div className="flex justify-between text-2xl font-bold text-green-700">
+    <span>Total Payable</span>
+    <span>
+      ₹{
+        (plan === "Monthly"
+          ? Number(parkingData?.monthlyPrice || 0)
+          : Number(parkingData?.yearlyPrice || 0)) +
+        Math.round(
+          ((plan === "Monthly"
+            ? Number(parkingData?.monthlyPrice || 0)
+            : Number(parkingData?.yearlyPrice || 0)) * 10) / 100
+        )
+      }
+    </span>
+  </div>
+
+
+
+  
 
 </div>
 
+<h2 className="text-2xl font-bold mb-6">
+  🚘 Vehicle Details
+</h2>
+
+<div className="grid md:grid-cols-2 gap-6">
+
+   
+
         
 
-         <input
-  type="date"
-  value={date}
-  onChange={(e) => setDate(e.target.value)}
-  className="border p-4 rounded-2xl"
-/>
 
-          <input
-  type="time"
-  value={time}
-  onChange={(e) => setTime(e.target.value)}
-  className="border p-4 rounded-2xl"
-/>
 
 <select
   value={vehicleType}
@@ -212,6 +293,107 @@ const [uploading, setUploading] =
 const parkingData =
   parkingDoc.data();
 
+  // CUSTOMER ALREADY HAS ACTIVE BOOKING?
+
+const existingBookingQuery = query(
+  collection(db, "bookings"),
+  where(
+    "customerUid",
+    "==",
+    localStorage.getItem("userUid")
+  ),
+  where(
+    "parkingId",
+    "==",
+    parkingDoc.id
+  )
+);
+
+const existingBooking =
+  await getDocs(existingBookingQuery);
+
+const alreadyBooked =
+  existingBooking.docs.find((doc) => {
+
+    const data = doc.data();
+
+    return (
+      data.bookingStatus === "Pending Approval" ||
+      data.bookingStatus === "Approved"
+    );
+
+  });
+
+if (alreadyBooked) {
+
+  alert(
+    "You already have an active booking for this parking."
+  );
+
+  return;
+
+}
+
+
+
+if (!existingBooking.empty) {
+
+  alert(
+    "You have already booked this parking. Please wait for owner approval."
+  );
+
+  return;
+
+}
+
+// CHECK WHETHER SOMEONE ELSE HAS ALREADY BOOKED THIS SLOT
+
+const occupiedQuery = query(
+  collection(db, "bookings"),
+  where(
+    "parkingId",
+    "==",
+    parkingDoc.id
+  )
+);
+
+const occupiedBooking =
+  await getDocs(occupiedQuery);
+
+const activeBooking =
+  occupiedBooking.docs.find((doc) => {
+
+    const data = doc.data();
+
+    return (
+      data.bookingStatus === "Pending Approval" ||
+      data.bookingStatus === "Approved"
+    );
+
+  });
+
+if (activeBooking) {
+
+  alert(
+    "This parking is already booked."
+  );
+
+  return;
+
+}
+
+
+
+if (!occupiedBooking.empty) {
+
+  alert(
+    "This parking has already been booked and is waiting for owner approval."
+  );
+
+  return;
+
+}
+
   // CHECK SLOT AVAILABILITY
 
 if (
@@ -226,19 +408,20 @@ if (
 
 }
 
-  const validTill =
-  new Date();
+  const bookingStart = new Date();
+
+const validTill = new Date(bookingStart);
 
 if (plan === "Monthly") {
 
-  validTill.setDate(
-    validTill.getDate() + 30
+  validTill.setMonth(
+    validTill.getMonth() + 1
   );
 
 } else {
 
-  validTill.setDate(
-    validTill.getDate() + 365
+  validTill.setFullYear(
+    validTill.getFullYear() + 1
   );
 
 }
@@ -294,6 +477,8 @@ if (
   return;
 
 }
+
+
 
 const bookingData = {
 
@@ -369,10 +554,18 @@ yearlyPrice:
 
   plan,
 
-  amount:
-  plan === "Monthly"
-    ? 3000
-    : 30000,
+parkingAmount,
+
+platformFeePercent,
+
+platformFeeAmount,
+
+customerPaidAmount,
+
+ownerReceivableAmount,
+
+ownerPayoutStatus:
+  "Pending",
 
     validTill:
   validTill.toISOString(),
@@ -392,17 +585,21 @@ yearlyPrice:
   vehicleImage:
   vehicleImageUrl,
 
-  bookingStatus:
-    "Pending Approval",
+bookingStatus:
+  "Pending Approval",
 
-  paymentStatus:
-    "Paid",
+ownerApprovalStatus:
+  "Pending",
 
-  bookingDate:
-    new Date(),
+paymentStatus:
+  "Paid",
 
-  date,
-  time,
+ bookingDate: bookingStart,
+
+bookingStartDate:
+  bookingStart.toISOString(),
+
+
 };
 
     try {
@@ -412,23 +609,53 @@ yearlyPrice:
       const options = {
   key: "rzp_test_Su5POE7a3UsqZv",
 amount:
-  (plan === "Monthly"
-    ? Number(parkingData?.monthlyPrice)
-    : Number(parkingData?.yearlyPrice)) * 100,
+  customerPaidAmount * 100,
   currency: "INR",
   name: "CarParking Bangalore",
   description: "Parking Booking Payment",
 
   handler: async function () {
 
-    alert("Payment Successful");
+  try {
 
     await addDoc(
       collection(db, "bookings"),
       bookingData
     );
 
-  },
+    await updateDoc(
+
+  doc(
+    db,
+    "parkings",
+    parkingDoc.id
+  ),
+
+  {
+
+    availableSlots: 0,
+
+    occupiedSlots: 1,
+
+    availability: "Occupied"
+
+  }
+
+);
+
+    alert("Payment Successful");
+
+    router.push("/bookings");
+
+  } catch (error) {
+
+    console.log(error);
+
+    alert("Booking could not be saved.");
+
+  }
+
+},
 
   theme: {
     color: "#22c55e",
@@ -446,7 +673,7 @@ razorpay.open();
   }}
   className="w-full bg-green-500 text-white py-4 rounded-2xl font-bold text-xl mt-8"
 >
-  Pay & Confirm Booking
+  {`🔒 Pay ₹${customerPaidAmount} Securely`}
 </button>
 
       </div>

@@ -32,6 +32,7 @@ import {
 } from "recharts";
 
 import { db } from "@/lib/firebase";
+import Dashboard from "./components/Dashboard";
 
 export default function AdminPage() {
 
@@ -104,6 +105,7 @@ const listingsPerPage = 6;
   const router = useRouter();
 
   const auth = getAuth();
+  const [ownerApplications, setOwnerApplications] = useState<any[]>([]);
 
   // ADMIN AUTH
 
@@ -247,6 +249,41 @@ if (
 
   }, []);
 
+  // FETCH OWNER APPLICATIONS
+
+useEffect(() => {
+
+  const unsubscribe =
+    onSnapshot(
+
+      collection(db, "ownerApplications"),
+
+      (snapshot) => {
+
+        const ownerData: any[] = [];
+
+        snapshot.forEach((doc) => {
+
+          ownerData.push({
+
+            id: doc.id,
+
+            ...doc.data(),
+
+          });
+
+        });
+
+        setOwnerApplications(ownerData);
+
+      }
+
+    );
+
+  return () => unsubscribe();
+
+}, []);
+
   // FETCH USERS
 
   useEffect(() => {
@@ -384,30 +421,58 @@ useEffect(() => {
 
   // STATS
 
-  const totalRevenue =
-    bookings.reduce(
+  const totalCustomerPayments =
+  bookings.reduce(
+    (acc, booking) =>
+      acc +
+      Number(
+        booking.customerPaidAmount || 0
+      ),
+    0
+  );
 
-      (acc, item) => {
+const totalPlatformRevenue =
+  bookings.reduce(
+    (acc, booking) =>
+      acc +
+      Number(
+        booking.platformFeeAmount || 0
+      ),
+    0
+  );
 
-        if (
-          item.plan === "Yearly"
-        ) {
-
-          return acc + 30000;
-
-        }
-
-        return (
-  acc +
-  Number(
-    item.amount || 0
-  )
-);
-
-      },
-
+const pendingOwnerPayout =
+  bookings
+    .filter(
+      (booking) =>
+        booking.ownerPayoutStatus !==
+        "Paid"
+    )
+    .reduce(
+      (acc, booking) =>
+        acc +
+        Number(
+          booking.ownerReceivableAmount ||
+            0
+        ),
       0
+    );
 
+const completedOwnerPayout =
+  bookings
+    .filter(
+      (booking) =>
+        booking.ownerPayoutStatus ===
+        "Paid"
+    )
+    .reduce(
+      (acc, booking) =>
+        acc +
+        Number(
+          booking.ownerReceivableAmount ||
+            0
+        ),
+      0
     );
 
   const availableCount =
@@ -735,12 +800,15 @@ const paginatedTickets =
       value: users.length,
     },
 
-    {
-      name: "Revenue",
-      value: totalRevenue,
-    },
+{
+  name: "Revenue",
+  value: totalPlatformRevenue,
+},
 
   ];
+
+
+
 
   const pieData = [
 
@@ -822,6 +890,30 @@ return (
       Bookings
     </button>
 
+<button
+  onClick={() => setActiveSection("payments")}
+  className={`w-full text-left px-6 py-4 rounded-2xl transition ${
+    activeSection === "payments"
+      ? "bg-green-500 text-white"
+      : "bg-gray-800 text-white hover:bg-gray-700"
+  }`}
+>
+  💳 Payments
+</button>
+
+<button
+  onClick={() =>
+    setActiveSection("ownerApplications")
+  }
+  className={`p-4 rounded-xl text-left ${
+    activeSection === "ownerApplications"
+      ? "bg-green-500"
+      : "bg-gray-800"
+  }`}
+>
+  🏢 Owner Applications
+</button>
+
     <button
       onClick={() =>
         setActiveSection("tickets")
@@ -891,7 +983,13 @@ return (
 
         {/* STATS */}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-6 mb-10">
+        <div className="mb-10">
+
+<h2 className="text-2xl font-bold mb-6">
+📊 Platform Overview
+</h2>
+
+<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6 mb-10">
 
           <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-8 rounded-3xl shadow-xl">
 
@@ -976,11 +1074,47 @@ return (
           <div className="bg-gradient-to-r from-black to-gray-800 text-white p-8 rounded-3xl shadow-xl">
 
   <p className="text-lg mb-3">
-    Revenue
+    Customer Payments
   </p>
 
-  <h2 className="text-5xl font-bold">
-    ₹{totalRevenue}
+  <h2 className="text-4xl font-bold">
+    ₹{totalCustomerPayments}
+  </h2>
+
+</div>
+
+<div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-8 rounded-3xl shadow-xl">
+
+  <p className="text-lg mb-3">
+    Platform Revenue
+  </p>
+
+  <h2 className="text-4xl font-bold">
+    ₹{totalPlatformRevenue}
+  </h2>
+
+</div>
+
+<div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-8 rounded-3xl shadow-xl">
+
+  <p className="text-lg mb-3">
+    Pending Payout
+  </p>
+
+  <h2 className="text-4xl font-bold">
+    ₹{pendingOwnerPayout}
+  </h2>
+
+</div>
+
+<div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-8 rounded-3xl shadow-xl">
+
+  <p className="text-lg mb-3">
+    Owners Paid
+  </p>
+
+  <h2 className="text-4xl font-bold">
+    ₹{completedOwnerPayout}
   </h2>
 
 </div>
@@ -1000,6 +1134,14 @@ return (
   
 
 </div>
+
+</div>
+
+<h2 className="text-2xl font-bold mb-6">
+💳 Financial Overview
+</h2>
+
+<div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10"></div>
 
 
 
@@ -1301,6 +1443,7 @@ return (
 
                 </span>
 
+                
               </td>
 
             </tr>
@@ -2304,6 +2447,333 @@ return (
 </div>
 
 </>
+)}
+
+{activeSection === "payments" && (
+<>
+  <div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
+
+    <div className="flex items-center justify-between mb-8">
+
+      <h2 className="text-4xl font-bold">
+        💳 Payment Management
+      </h2>
+
+      <div className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold">
+        {bookings.length} Payments
+      </div>
+
+    </div>
+
+    <div className="overflow-x-auto">
+
+      <table className="w-full">
+
+        <thead>
+
+          <tr className="bg-gray-100">
+
+            <th className="p-4 text-left">
+              Booking ID
+            </th>
+
+            <th className="p-4 text-left">
+              Customer
+            </th>
+
+            <th className="p-4 text-left">
+              Customer Paid
+            </th>
+
+            <th className="p-4 text-left">
+              Platform Fee
+            </th>
+
+            <th className="p-4 text-left">
+              Owner Receives
+            </th>
+
+            <th className="p-4 text-left">
+              Payment Status
+            </th>
+
+            <th className="p-4 text-left">
+  UTR
+</th>
+
+<th className="p-4 text-left">
+  Paid On
+</th>
+
+            <th className="p-4 text-left">
+              Action
+            </th>
+
+          </tr>
+
+        </thead>
+
+        <tbody>
+
+          {bookings.map((booking) => (
+
+            <tr
+              key={booking.id}
+              className="border-b"
+            >
+
+              <td className="p-4">
+                {booking.bookingId}
+              </td>
+
+              <td className="p-4">
+                {booking.name}
+              </td>
+
+              <td className="p-4 font-bold text-black">
+                ₹{booking.customerPaidAmount || 0}
+              </td>
+
+              <td className="p-4 text-green-600 font-bold">
+                ₹{booking.platformFeeAmount || 0}
+              </td>
+
+              <td className="p-4 text-blue-600 font-bold">
+                ₹{booking.ownerReceivableAmount || 0}
+              </td>
+
+              <td className="p-4">
+
+<span
+  className={`px-3 py-1 rounded-full font-bold ${
+    booking.ownerPayoutStatus === "Paid"
+      ? "bg-green-100 text-green-700"
+      : "bg-yellow-100 text-yellow-700"
+  }`}
+>
+  {booking.ownerPayoutStatus === "Paid"
+  ? "✅ Paid"
+  : "🟡 Pending"}
+</span>
+
+              </td>
+
+              <td className="p-4 font-mono text-sm">
+  {booking.paymentReference || "-"}
+</td>
+
+<td className="p-4">
+  {booking.ownerPaidDate
+    ? new Date(
+        booking.ownerPaidDate.seconds
+          ? booking.ownerPaidDate.seconds * 1000
+          : booking.ownerPaidDate
+      ).toLocaleDateString()
+    : "-"}
+</td>
+
+              <td className="p-4">
+
+               <button
+  className={`px-4 py-2 rounded-xl text-white font-bold ${
+    booking.ownerPayoutStatus === "Paid"
+      ? "bg-gray-500"
+      : "bg-green-600 hover:bg-green-700"
+  }`}
+disabled={
+  booking.ownerPayoutStatus === "Paid" ||
+  booking.bookingStatus !== "Completed"
+}
+  onClick={async () => {
+
+    if (booking.ownerPayoutStatus === "Paid") {
+      return;
+    }
+
+const utr = prompt(
+  "Enter UTR / Transaction Reference Number"
+);
+
+if (!utr) {
+  alert("UTR is required.");
+  return;
+}
+
+const confirmPayment = confirm(
+  `Release ₹${booking.ownerReceivableAmount} to the parking owner?`
+);
+
+if (!confirmPayment) return;
+
+    try {
+
+await updateDoc(
+  doc(db, "bookings", booking.id),
+  {
+    ownerPayoutStatus: "Paid",
+    paymentStatus: "Paid",
+    ownerPaidDate: new Date(),
+    paymentReference: utr,
+  }
+);
+
+      alert("Payment Released Successfully.");
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert("Unable to release payment.");
+
+    }
+
+  }}
+>
+{
+  booking.ownerPayoutStatus === "Paid"
+    ? "Paid"
+    : booking.bookingStatus !== "Completed"
+    ? "Not Eligible"
+    : "Release Payment"
+}
+</button>
+
+              </td>
+
+            </tr>
+
+          ))}
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+</>
+)}
+
+{activeSection === "ownerApplications" && (
+
+<div className="bg-white rounded-3xl shadow-xl p-8">
+
+<h2 className="text-4xl font-bold mb-8">
+🏢 Owner Applications
+</h2>
+
+<div className="overflow-x-auto">
+
+<table className="w-full">
+
+<thead>
+
+<tr className="bg-gray-100">
+
+<th className="p-4 text-left">Owner</th>
+
+<th className="p-4 text-left">Email</th>
+
+<th className="p-4 text-left">Phone</th>
+
+<th className="p-4 text-left">Status</th>
+
+<th className="p-4 text-left">Action</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{ownerApplications.map((owner) => (
+
+<tr
+key={owner.id}
+className="border-b"
+>
+
+<td className="p-4 font-semibold">
+  {owner.userName}
+</td>
+
+<td className="p-4">
+  {owner.userEmail}
+</td>
+
+<td className="p-4">
+  {owner.userPhone}
+</td>
+
+<td className="p-4">
+
+<span
+className={`px-3 py-1 rounded-full font-bold ${
+owner.status === "Approved"
+? "bg-green-100 text-green-700"
+: owner.status === "Rejected"
+? "bg-red-100 text-red-700"
+: "bg-yellow-100 text-yellow-700"
+}`}
+>
+
+{owner.status}
+
+</span>
+
+</td>
+
+<td className="p-4">
+
+<button
+  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl"
+  onClick={async () => {
+
+    const confirmApprove = confirm(
+      `Approve ${owner.userName} as Parking Owner?`
+    );
+
+    if (!confirmApprove) return;
+
+    try {
+
+      await updateDoc(
+        doc(db, "ownerApplications", owner.id),
+        {
+          status: "Approved",
+          approvedAt: new Date(),
+        }
+      );
+
+      alert("Owner Approved Successfully.");
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert("Unable to approve owner.");
+
+    }
+
+  }}
+>
+  Approve
+</button>
+
+</td>
+
+</tr>
+
+))}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
 )}
 
 {activeSection === "tickets" && (

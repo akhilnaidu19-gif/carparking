@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 import { db, app, storage } from "@/lib/firebase";
 
 import {
@@ -69,7 +71,13 @@ export default function AddParkingPage() {
   const [loading, setLoading] =
     useState(false);
 
+    const [ownerStatus, setOwnerStatus] = useState("");
+
+const [checkingOwner, setCheckingOwner] = useState(true);
+
   const auth = getAuth(app);
+
+  const router = useRouter();
 
   // AUTH
 
@@ -91,6 +99,74 @@ export default function AddParkingPage() {
     return () => unsubscribe();
 
   }, []);
+
+  // CHECK OWNER STATUS
+
+useEffect(() => {
+
+  if (!user) return;
+
+  const q = query(
+
+    collection(db, "ownerApplications"),
+
+    where(
+      "userEmail",
+      "==",
+      user.email
+    )
+
+  );
+
+  const unsubscribe =
+    onSnapshot(
+
+      q,
+
+      (snapshot) => {
+
+        if (snapshot.empty) {
+
+          setOwnerStatus("NotOwner");
+
+        } else {
+
+          setOwnerStatus(
+            snapshot.docs[0].data().status
+          );
+
+        }
+
+        setCheckingOwner(false);
+
+      }
+
+    );
+
+  return () => unsubscribe();
+
+}, [user]);
+
+// REDIRECT NON-OWNERS
+
+useEffect(() => {
+
+  if (
+    !checkingOwner &&
+    ownerStatus === "NotOwner"
+  ) {
+
+    router.push("/become-owner");
+
+  }
+
+}, [
+  checkingOwner,
+  ownerStatus,
+  router,
+]);
+
+
 
   // FETCH OWNER PARKINGS
 
@@ -163,6 +239,56 @@ export default function AddParkingPage() {
     );
 
   }
+
+  // OWNER APPROVAL CHECK
+
+if (checkingOwner) {
+
+  return (
+
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+
+      <h1 className="text-3xl font-bold">
+
+        Checking Owner Access...
+
+      </h1>
+
+    </div>
+
+  );
+
+}
+
+
+
+if (ownerStatus === "Pending") {
+
+  return (
+
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+
+      <div className="bg-white p-10 rounded-3xl shadow-xl text-center">
+
+        <h1 className="text-4xl font-bold text-yellow-600 mb-4">
+
+          Your application is under review
+
+        </h1>
+
+        <p className="text-gray-600 text-lg">
+
+          Once the admin approves your application, you can start listing parking spaces.
+
+        </p>
+
+      </div>
+
+    </div>
+
+  );
+
+}
 
   return (
 

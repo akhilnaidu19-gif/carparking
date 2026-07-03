@@ -137,13 +137,14 @@ const [availableOnly,
 
     setLoading(true);
 
-    const unsubscribe =
-      onSnapshot(
+    const q = query(
+  collection(db, "parkings"),
+  where("status", "==", "Approved")
+);
 
-        collection(
-          db,
-          "parkings"
-        ),
+    const unsubscribe =
+onSnapshot(
+  q,
 
         (snapshot) => {
 
@@ -821,12 +822,18 @@ backgroundImage:
 
                 })
 
-                .map((spot) => (
+.map((spot) => {
 
-                  <div
-  key={spot.id}
-  className="min-w-[350px] max-w-[350px] bg-white rounded-3xl shadow-lg overflow-hidden"
->
+  const isOwner =
+    user &&
+    spot.ownerUid === user.uid;
+
+  return (
+
+    <div
+      key={spot.id}
+      className="min-w-[350px] max-w-[350px] bg-white rounded-3xl shadow-lg overflow-hidden"
+    >
 
                     <div className="relative">
 
@@ -1193,7 +1200,16 @@ backgroundImage:
 
                       <div className="flex gap-3">
 
-                        {Number(spot.availableSlots) > 0 ? (
+                       {isOwner ? (
+
+  <button
+    disabled
+    className="flex-1 bg-blue-500 text-white py-3 rounded-2xl font-bold cursor-not-allowed"
+  >
+    Your Listing
+  </button>
+
+) : Number(spot.availableSlots) > 0 ? (
 
   <Link
     href={`/parking/${spot.id}`}
@@ -1224,9 +1240,11 @@ backgroundImage:
 
                     </div>
 
-                  </div>
+                 </div>
 
-                ))}
+                  );
+
+                })}
 
             </div>
 

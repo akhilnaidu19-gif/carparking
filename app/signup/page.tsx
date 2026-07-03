@@ -220,7 +220,7 @@ export default function SignupPage() {
 
                   photo: imageURL,
 
-                  role: "user",
+                  role: "customer",
 
                   createdAt:
                     new Date(),

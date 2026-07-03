@@ -189,6 +189,11 @@ if (
 
               );
 
+              localStorage.setItem(
+  "userRole",
+  userData?.role || "customer"
+);
+
               // ADMIN CHECK
 
               if (
