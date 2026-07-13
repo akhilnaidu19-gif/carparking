@@ -36,11 +36,14 @@ import Dashboard from "./components/Dashboard";
 
 export default function AdminPage() {
 
+  
+
   const [parkings, setParkings] =
     useState<any[]>([]);
 
   const [bookings, setBookings] =
     useState<any[]>([]);
+    const [payments, setPayments] = useState<any[]>([]);
 
   const [users, setUsers] =
     useState<any[]>([]);
@@ -57,6 +60,9 @@ export default function AdminPage() {
   const [filter, setFilter] =
     useState("All");
 
+    const [listingTab, setListingTab] =
+  useState("Pending");
+
   const [notification, setNotification] =
     useState("");
 
@@ -65,6 +71,15 @@ export default function AdminPage() {
 
   const [activeSection, setActiveSection] =
   useState("dashboard");
+
+  const [showAllRefunds, setShowAllRefunds] =
+  useState(false);
+
+  const [showAllRefundHistory, setShowAllRefundHistory] =
+  useState(false);
+
+const [showAllPayouts, setShowAllPayouts] =
+  useState(false);
 
 const [remarks, setRemarks] =
   useState<{ [key: string]: string }>({});
@@ -83,6 +98,9 @@ const ticketsPerPage = 5;
 
 const [userSearch, setUserSearch] =
   useState("");
+
+  const [userTab, setUserTab] =
+  useState("All");
 
 const [userPage, setUserPage] =
   useState(1);
@@ -106,6 +124,104 @@ const listingsPerPage = 6;
 
   const auth = getAuth();
   const [ownerApplications, setOwnerApplications] = useState<any[]>([]);
+
+const getRefundDate = (booking: any) => {
+  const dateValue =
+    booking.refundProcessedAt ||
+    booking.refundCompletedAt ||
+    booking.refundRequestedAt ||
+    booking.cancelledAt ||
+    booking.bookingDate;
+
+  if (dateValue?.seconds) {
+    return dateValue.seconds * 1000;
+  }
+
+  if (dateValue) {
+    return new Date(dateValue).getTime();
+  }
+
+  return 0;
+};
+
+const pendingRefunds = payments
+  .filter(
+    (payment) =>
+      payment.refundStatus === "Pending" ||
+      payment.paymentStatus === "Refund Pending"
+  )
+  .sort(
+    (a, b) =>
+      getRefundDate(b) -
+      getRefundDate(a)
+  );
+
+const refundHistory = payments
+  .filter(
+    (booking) =>
+      booking.refundStatus === "Completed" ||
+      booking.refundStatus === "Processing" ||
+      booking.refundStatus === "Failed" ||
+      booking.paymentStatus === "Refunded" ||
+      booking.paymentStatus === "Refund Processing"
+  )
+  .sort(
+    (a, b) =>
+      getRefundDate(b) -
+      getRefundDate(a)
+  );
+
+const visibleRefunds = showAllRefunds
+  ? pendingRefunds
+  : pendingRefunds.slice(0, 3);
+
+const visibleRefundHistory =
+  showAllRefundHistory
+    ? refundHistory
+    : refundHistory.slice(0, 5);
+
+const ownerPayouts = payments
+  .filter((booking) => {
+    const hasPayoutAmount =
+      Number(booking.ownerReceivableAmount || 0) > 0;
+
+    const isEligibleStatus =
+      booking.bookingStatus === "Completed" ||
+      booking.bookingStatus === "Cancelled After Approval";
+
+    const isAlreadyPaid =
+      booking.ownerPayoutStatus === "Paid";
+
+    return (
+      hasPayoutAmount &&
+      (isEligibleStatus || isAlreadyPaid)
+    );
+  })
+  .sort((a, b) => {
+    const getDate = (booking: any) => {
+      const dateValue =
+        booking.ownerPaidDate ||
+        booking.cancelledAt ||
+        booking.bookingDate ||
+        booking.createdAt;
+
+      if (dateValue?.seconds) {
+        return dateValue.seconds * 1000;
+      }
+
+      if (dateValue) {
+        return new Date(dateValue).getTime();
+      }
+
+      return 0;
+    };
+
+    return getDate(b) - getDate(a);
+  });
+
+const visibleOwnerPayouts = showAllPayouts
+  ? ownerPayouts
+  : ownerPayouts.slice(0, 5);
 
   // ADMIN AUTH
 
@@ -135,8 +251,13 @@ const listingsPerPage = 6;
     )
   );
 
-const userData =
-  userDoc.data();
+if (!userDoc.exists()) {
+  alert("User profile not found.");
+  router.push("/");
+  return;
+}
+
+const userData = userDoc.data();
 
 if (
   userData?.role ===
@@ -248,6 +369,55 @@ if (
     return () => unsubscribe();
 
   }, []);
+
+  // FETCH PAYMENTS
+
+useEffect(() => {
+
+  const unsubscribe =
+    onSnapshot(
+
+      collection(db, "payments"),
+
+      (snapshot) => {
+
+        const paymentData: any[] = [];
+
+        snapshot.forEach((paymentDoc) => {
+
+          paymentData.push({
+
+            id: paymentDoc.id,
+
+            ...paymentDoc.data(),
+
+          });
+
+        });
+
+        setPayments(paymentData);
+
+        console.log(
+          "Payments loaded:",
+          paymentData
+        );
+
+      },
+
+      (error) => {
+
+        console.error(
+          "Unable to load payments:",
+          error
+        );
+
+      }
+
+    );
+
+  return () => unsubscribe();
+
+}, []);
 
   // FETCH OWNER APPLICATIONS
 
@@ -421,45 +591,47 @@ useEffect(() => {
 
   // STATS
 
-  const totalCustomerPayments =
-  bookings.reduce(
-    (acc, booking) =>
-      acc +
+const totalCustomerPayments =
+  payments.reduce(
+    (sum, payment) =>
+      sum +
       Number(
-        booking.customerPaidAmount || 0
+        payment.customerPaidAmount || 0
       ),
     0
   );
 
 const totalPlatformRevenue =
-  bookings.reduce(
-    (acc, booking) =>
+  payments.reduce(
+    (acc, payment) =>
       acc +
+      Number(payment.platformFeeAmount || 0),
+    0
+  );
+
+const pendingOwnerPayments =
+  payments
+  .filter((booking) => {
+    const eligibleStatus =
+      booking.bookingStatus === "Completed" ||
+      booking.bookingStatus === "Cancelled After Approval";
+
+    return (
+      eligibleStatus &&
+      booking.ownerPayoutStatus !== "Paid"
+    );
+  })
+  .reduce(
+    (total, booking) =>
+      total +
       Number(
-        booking.platformFeeAmount || 0
+        booking.ownerReceivableAmount || 0
       ),
     0
   );
 
-const pendingOwnerPayout =
-  bookings
-    .filter(
-      (booking) =>
-        booking.ownerPayoutStatus !==
-        "Paid"
-    )
-    .reduce(
-      (acc, booking) =>
-        acc +
-        Number(
-          booking.ownerReceivableAmount ||
-            0
-        ),
-      0
-    );
-
 const completedOwnerPayout =
-  bookings
+  payments
     .filter(
       (booking) =>
         booking.ownerPayoutStatus ===
@@ -592,7 +764,15 @@ const resolvedTickets =
         .toLowerCase()
         .includes(
           ticketSearch.toLowerCase()
-        );
+        )
+        
+        ||
+
+(ticket.userId || "")
+  .toLowerCase()
+  .includes(
+    ticketSearch.toLowerCase()
+  );
 
     return (
       categoryMatch &&
@@ -603,39 +783,27 @@ const resolvedTickets =
   
 );
 
-const filteredUsers = users.filter(
-  (user) => {
+const filteredUsers = users.filter((user) => {
+  const searchMatch =
+    (user.name || "").toLowerCase().includes(userSearch.toLowerCase()) ||
+    (user.email || "").toLowerCase().includes(userSearch.toLowerCase()) ||
+    (user.phone || "").toLowerCase().includes(userSearch.toLowerCase()) ||
+    (user.city || "").toLowerCase().includes(userSearch.toLowerCase()) ||
+    (user.userId || "").toLowerCase().includes(userSearch.toLowerCase());
 
-    return (
+  const tabMatch =
+    userTab === "All"
+      ? true
+      : userTab === "Customers"
+      ? user.role === "customer" && user.isOwner !== true
+      : userTab === "Owners"
+      ? user.isOwner === true || user.role === "owner"
+      : userTab === "Admins"
+      ? user.role === "admin"
+      : user.status === "Blocked";
 
-      (user.name || "")
-        .toLowerCase()
-        .includes(
-          userSearch.toLowerCase()
-        ) ||
-
-      (user.email || "")
-        .toLowerCase()
-        .includes(
-          userSearch.toLowerCase()
-        ) ||
-
-      (user.phone || "")
-        .toLowerCase()
-        .includes(
-          userSearch.toLowerCase()
-        ) ||
-
-      (user.city || "")
-        .toLowerCase()
-        .includes(
-          userSearch.toLowerCase()
-        )
-
-    );
-
-  }
-);
+  return searchMatch && tabMatch;
+});
 
 const totalUserPages =
   Math.ceil(
@@ -652,34 +820,53 @@ const paginatedUsers =
       usersPerPage
   );
 
-  const filteredBookings =
+ const filteredBookings =
   bookings.filter((booking) => {
+
+    const searchValue =
+      bookingSearch.toLowerCase();
 
     return (
 
-      (booking.name || "")
+      (booking.bookingId || "")
         .toLowerCase()
-        .includes(
-          bookingSearch.toLowerCase()
-        ) ||
+        .includes(searchValue)
 
-      (booking.email || "")
+      ||
+
+      (booking.customerId || "")
         .toLowerCase()
-        .includes(
-          bookingSearch.toLowerCase()
-        ) ||
+        .includes(searchValue)
+
+      ||
+
+      (booking.customerName || booking.name || "")
+        .toLowerCase()
+        .includes(searchValue)
+
+      ||
+
+      (booking.customerEmail || booking.email || "")
+        .toLowerCase()
+        .includes(searchValue)
+
+      ||
+
+      (booking.customerPhone || "")
+        .toLowerCase()
+        .includes(searchValue)
+
+      ||
 
       (booking.title || "")
         .toLowerCase()
-        .includes(
-          bookingSearch.toLowerCase()
-        ) ||
+        .includes(searchValue)
+
+      ||
 
       (booking.location || "")
         .toLowerCase()
-        .includes(
-          bookingSearch.toLowerCase()
-        )
+        .includes(searchValue)
 
     );
 
@@ -700,54 +887,45 @@ const paginatedBookings =
       bookingsPerPage
   );
 
-  const filteredListings =
-  parkings.filter((parking) => {
+  const filteredListings = parkings.filter((parking) => {
 
-    const matchesSearch =
+  const matchesSearch =
 
-      (parking.title || "")
-        .toLowerCase()
-        .includes(
-          search.toLowerCase()
-        ) ||
+    (parking.title || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
 
-      (parking.location || "")
-        .toLowerCase()
-        .includes(
-          search.toLowerCase()
-        ) ||
+    ||
 
-      (parking.ownerName || "")
-        .toLowerCase()
-        .includes(
-          search.toLowerCase()
-        );
+    (parking.location || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
 
-    const matchesFilter =
+    ||
 
-      filter === "All"
+    (parking.ownerName || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
 
-        ? true
+    ||
 
-        : filter === "Pending"
+    (parking.ownerId || "")
+      .toLowerCase()
+      .includes(search.toLowerCase());
 
-        ? parking.status ===
-          "Pending"
+  const matchesTab =
+    listingTab === "Pending"
+      ? parking.status === "Pending"
+      : listingTab === "Approved"
+      ? parking.status === "Approved"
+      : parking.status === "Rejected";
 
-        : filter === "Approved"
+  return (
+    matchesSearch &&
+    matchesTab
+  );
 
-        ? parking.status ===
-          "Approved"
-
-        : parking.availability ===
-          filter;
-
-    return (
-      matchesSearch &&
-      matchesFilter
-    );
-
-  });
+});
 
 const totalListingPages =
   Math.ceil(
@@ -1102,7 +1280,7 @@ return (
   </p>
 
   <h2 className="text-4xl font-bold">
-    ₹{pendingOwnerPayout}
+    ₹{pendingOwnerPayments}
   </h2>
 
 </div>
@@ -1480,41 +1658,69 @@ return (
             className="border p-4 rounded-2xl flex-1"
           />
 
-          <select
-            value={filter}
-            onChange={(e) => {
+          <div className="flex gap-4 mb-8">
 
-  setFilter(
-    e.target.value
-  );
-
-  setListingPage(1);
-
+<button
+onClick={()=>{
+setListingTab("Pending");
+setListingPage(1);
 }}
-            className="border p-4 rounded-2xl"
-          >
+className={`px-6 py-3 rounded-2xl font-bold ${
+listingTab==="Pending"
+?"bg-orange-500 text-white"
+:"bg-gray-200"
+}`}
+>
+Pending (
+{
+parkings.filter(
+p=>p.status==="Pending"
+).length
+}
+)
+</button>
 
-            <option>
-              All
-            </option>
+<button
+onClick={()=>{
+setListingTab("Approved");
+setListingPage(1);
+}}
+className={`px-6 py-3 rounded-2xl font-bold ${
+listingTab==="Approved"
+?"bg-green-600 text-white"
+:"bg-gray-200"
+}`}
+>
+Approved (
+{
+parkings.filter(
+p=>p.status==="Approved"
+).length
+}
+)
+</button>
 
-            <option>
-              Available
-            </option>
+<button
+onClick={()=>{
+setListingTab("Rejected");
+setListingPage(1);
+}}
+className={`px-6 py-3 rounded-2xl font-bold ${
+listingTab==="Rejected"
+?"bg-red-600 text-white"
+:"bg-gray-200"
+}`}
+>
+Rejected (
+{
+parkings.filter(
+p=>p.status==="Rejected"
+).length
+}
+)
+</button>
 
-            <option>
-              Occupied
-            </option>
-
-            <option>
-              Pending
-            </option>
-
-            <option>
-              Approved
-            </option>
-
-          </select>
+</div>
 
         </div>
 
@@ -1524,7 +1730,7 @@ return (
 
           <h2 className="text-4xl font-bold mb-8">
 
-            Parking Listings
+            {listingTab} Parking Listings
 
           </h2>
 
@@ -1555,10 +1761,11 @@ return (
 
                           <span
                             className={`px-4 py-2 rounded-xl font-bold text-white ${
-                              parking.status ===
-                              "Approved"
-                                ? "bg-green-500"
-                                : "bg-orange-500"
+parking.status === "Approved"
+  ? "bg-green-500"
+  : parking.status === "Rejected"
+  ? "bg-red-500"
+  : "bg-orange-500"
                             }`}
                           >
 
@@ -1636,22 +1843,34 @@ return (
                           <div>
 
                             <h4 className="font-bold text-xl">
+  {parking.ownerName}
+</h4>
 
-                              {parking.ownerName}
+<p className="text-gray-500">
+  Owner ID: {parking.ownerId || "N/A"}
+</p>
 
-                            </h4>
-
-                            <p className="text-gray-500">
-
-                              {parking.ownerEmail}
-
-                            </p>
+<p className="text-gray-500">
+  {parking.ownerEmail}
+</p>
 
                           </div>
 
                         </div>
 
                       </div>
+
+                      <textarea
+  placeholder="Rejection Remarks..."
+  value={remarks[parking.id] || ""}
+  onChange={(e) =>
+    setRemarks({
+      ...remarks,
+      [parking.id]: e.target.value,
+    })
+  }
+  className="w-full border p-3 rounded-xl mt-4 h-24"
+/>
 
                       {/* ACTIONS */}
 
@@ -1671,13 +1890,10 @@ return (
                                 parking.id
                               ),
 
-                              {
-                                status:
-                                  parking.status ===
-                                  "Approved"
-                                    ? "Pending"
-                                    : "Approved",
-                              }
+                             {
+  status: "Approved",
+  availability: "Available",
+}
 
                             );
 
@@ -1708,12 +1924,7 @@ return (
 
 }
 
-                            alert(
-                              parking.status ===
-                                "Approved"
-                                ? "Moved To Pending"
-                                : "Listing Approved"
-                            );
+                            alert("Listing Approved Successfully");
 
                           }}
 
@@ -1726,12 +1937,45 @@ return (
 
                         >
 
-                          {parking.status ===
-                          "Approved"
-                            ? "Move To Pending"
-                            : "Approve Listing"}
+                         Approve Listing
 
                         </button>
+
+                        {/* REJECT */}
+
+<button
+  onClick={async () => {
+    if (!remarks[parking.id]?.trim()) {
+      alert("Please enter rejection remarks.");
+      return;
+    }
+
+    await updateDoc(
+      doc(db, "parkings", parking.id),
+      {
+        status: "Rejected",
+        availability: "Rejected",
+        adminRemarks: remarks[parking.id],
+      }
+    );
+
+    await addDoc(
+      collection(db, "notifications"),
+      {
+        ownerId: parking.ownerId,
+        title: "Listing Rejected",
+        message: `${parking.title} was rejected by admin.`,
+        createdAt: new Date(),
+        read: false,
+      }
+    );
+
+    alert("Listing Rejected");
+  }}
+  className="bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-2xl font-bold"
+>
+  Reject Listing
+</button>
 
                         {/* VERIFY */}
 
@@ -1932,42 +2176,61 @@ return (
 
 <div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
 
-  <div className="flex items-center justify-between mb-8">
+  <div className="mb-8">
 
-<div className="flex items-center gap-4">
+  <div className="flex items-center justify-between mb-6">
 
-  <h2 className="text-4xl font-bold">
+    <h2 className="text-4xl font-bold">
+      User Management
+    </h2>
 
-    User Management
+    <div className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold">
+      {filteredUsers.length} Users
+    </div>
 
-  </h2>
+  </div>
 
   <input
     type="text"
     placeholder="Search Name, Email, Phone, City"
     value={userSearch}
     onChange={(e) => {
-
-      setUserSearch(
-        e.target.value
-      );
-
+      setUserSearch(e.target.value);
       setUserPage(1);
-
     }}
-    className="border p-2 rounded-xl w-96"
+    className="border p-4 rounded-2xl w-full mb-6"
   />
 
-</div>
-
-    <div className="bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold">
-
-      {users.length} Users
-
-    </div>
-
+  <div className="flex flex-wrap gap-3">
+    {["All", "Customers", "Owners", "Admins", "Blocked"].map((tab) => (
+      <button
+        key={tab}
+        onClick={() => {
+          setUserTab(tab);
+          setUserPage(1);
+        }}
+        className={`px-5 py-3 rounded-2xl font-bold ${
+          userTab === tab
+            ? "bg-blue-600 text-white"
+            : "bg-gray-200"
+        }`}
+      >
+        {tab} (
+        {tab === "All"
+          ? users.length
+          : tab === "Customers"
+          ? users.filter((u) => u.role === "customer" && u.isOwner !== true).length
+          : tab === "Owners"
+          ? users.filter((u) => u.isOwner === true || u.role === "owner").length
+          : tab === "Admins"
+          ? users.filter((u) => u.role === "admin").length
+          : users.filter((u) => u.status === "Blocked").length}
+        )
+      </button>
+    ))}
   </div>
 
+</div>
   <div className="grid gap-6">
 
     {paginatedUsers.map((user) => (
@@ -2000,6 +2263,10 @@ return (
               {user.email}
 
             </p>
+
+            <p className="text-gray-500">
+  ID: {user.userId || "N/A"}
+</p>
 
             <p className="text-gray-500">
 
@@ -2205,41 +2472,30 @@ return (
 
 <div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
 
-  <div className="flex items-center justify-between mb-8">
+ <div className="mb-8">
 
-<div className="flex items-center gap-4">
+  <div className="flex items-center justify-between mb-6">
+    <h2 className="text-4xl font-bold">
+      Booking Management
+    </h2>
 
-  <h2 className="text-4xl font-bold">
-
-    Booking Management
-
-  </h2>
+    <div className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold">
+      {filteredBookings.length} Bookings
+    </div>
+  </div>
 
   <input
     type="text"
-    placeholder="Search Booking..."
+    placeholder="Search Booking ID, Customer ID, Name, Email, Phone..."
     value={bookingSearch}
     onChange={(e) => {
-
-      setBookingSearch(
-        e.target.value
-      );
-
+      setBookingSearch(e.target.value);
       setBookingPage(1);
-
     }}
-    className="border p-2 rounded-xl w-96"
+    className="border p-4 rounded-2xl w-full"
   />
 
 </div>
-
-    <div className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold">
-
-      {bookings.length} Bookings
-
-    </div>
-
-  </div>
 
   <div className="grid gap-6">
 
@@ -2250,7 +2506,7 @@ return (
         className="bg-gray-50 border rounded-3xl p-6"
       >
 
-        <div className="grid md:grid-cols-4 gap-6">
+<div className="grid md:grid-cols-4 gap-8">
 
           <div>
 
@@ -2259,12 +2515,12 @@ return (
             </p>
 
             <h3 className="font-bold text-xl">
-              {booking.name}
+              {booking.customerName || "Customer Name Not Available"}
             </h3>
 
-            <p>
-              {booking.email}
-            </p>
+<p className="break-words text-gray-600 max-w-xs">
+  {booking.customerEmail || "Email Not Available"}
+</p>
 
           </div>
 
@@ -2275,11 +2531,11 @@ return (
             </p>
 
             <h3 className="font-bold">
-              {booking.title}
+              {booking.parkingTitle || "Parking Name Not Available"}
             </h3>
 
             <p>
-              {booking.location}
+              {booking.parkingLocation || "Location Not Available"}
             </p>
 
           </div>
@@ -2453,200 +2709,867 @@ return (
 <>
   <div className="bg-white rounded-3xl shadow-xl p-8 mb-10">
 
-    <div className="flex items-center justify-between mb-8">
+    <h2 className="text-4xl font-bold mb-8">
+      💳 Payments & Refunds
+    </h2>
 
-      <h2 className="text-4xl font-bold">
-        💳 Payment Management
-      </h2>
+    <p className="text-gray-500 mb-4">
+  Payments collection records: {payments.length}
+</p>
 
-      <div className="bg-green-500 text-white px-6 py-3 rounded-2xl font-bold">
-        {bookings.length} Payments
+    {/* PAYMENT SUMMARY */}
+
+    <div className="grid md:grid-cols-4 gap-6 mb-10">
+
+      <div className="bg-green-100 p-6 rounded-3xl">
+        <p className="text-gray-600">Customer Payments</p>
+        <h2 className="text-3xl font-bold text-green-700">
+          ₹{totalCustomerPayments}
+        </h2>
+      </div>
+
+      <div className="bg-blue-100 p-6 rounded-3xl">
+        <p className="text-gray-600">Platform Revenue</p>
+        <h2 className="text-3xl font-bold text-blue-700">
+          ₹{totalPlatformRevenue}
+        </h2>
+      </div>
+
+      <div className="bg-red-100 p-6 rounded-3xl">
+        <p className="text-gray-600">Pending Refunds</p>
+        <h2 className="text-3xl font-bold text-red-700">
+          {pendingRefunds.length}
+        </h2>
+      </div>
+
+      <div className="bg-purple-100 p-6 rounded-3xl">
+  <p className="text-gray-600">
+    Refund History
+  </p>
+
+  <h2 className="text-3xl font-bold text-purple-700">
+    {refundHistory.length}
+  </h2>
+</div>
+
+      <div className="bg-yellow-100 p-6 rounded-3xl">
+        <p className="text-gray-600">Pending Owner Payout</p>
+        <h2 className="text-3xl font-bold text-yellow-700">
+          ₹{pendingOwnerPayments}
+        </h2>
       </div>
 
     </div>
 
-    <div className="overflow-x-auto">
+    {/* REFUND REQUESTS */}
 
-      <table className="w-full">
+    <div className="bg-red-50 border border-red-300 rounded-3xl p-8 mb-12">
 
-        <thead>
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-3xl font-bold text-red-700">
+          Refund Requests
+        </h2>
 
-          <tr className="bg-gray-100">
+        <div className="bg-red-600 text-white px-5 py-3 rounded-2xl font-bold">
+          {pendingRefunds.length} Pending
+        </div>
+      </div>
 
-            <th className="p-4 text-left">
-              Booking ID
-            </th>
+      {pendingRefunds.length === 0 ? (
+        <p className="text-gray-500">
+          No refund requests pending.
+        </p>
+      ) : (
+        <>
+          <div className="grid gap-6">
+            {visibleRefunds.map((booking) => (
+              <div
+                key={booking.id}
+                className="bg-white border rounded-3xl p-6"
+              >
+                <div className="flex justify-between items-start mb-5">
+                  <div>
+                    <h3 className="text-2xl font-bold">
+                      Booking: {booking.bookingId}
+                    </h3>
+                    <p className="text-gray-500">
+                      Cancelled On:{" "}
+                      {booking.cancelledAt?.seconds
+                        ? new Date(booking.cancelledAt.seconds * 1000).toLocaleString()
+                        : booking.cancelledAt
+                        ? new Date(booking.cancelledAt).toLocaleString()
+                        : "N/A"}
+                    </p>
+                  </div>
 
-            <th className="p-4 text-left">
-              Customer
-            </th>
+                  <span className="bg-yellow-100 text-yellow-700 px-4 py-2 rounded-xl font-bold">
+                    {booking.refundStatus || "Pending"}
+                  </span>
+                </div>
 
-            <th className="p-4 text-left">
-              Customer Paid
-            </th>
+                <div className="grid md:grid-cols-3 gap-6">
 
-            <th className="p-4 text-left">
-              Platform Fee
-            </th>
+                  <div className="bg-gray-50 p-5 rounded-2xl">
+                    <h4 className="font-bold text-blue-700 mb-3">
+                      👤 Customer Details
+                    </h4>
+                    <p><b>Name:</b> {booking.customerName || "N/A"}</p>
+                    <p><b>Phone:</b> {booking.customerPhone || "N/A"}</p>
+                    <p><b>Email:</b> {booking.customerEmail || "N/A"}</p>
+                    <p><b>Customer ID:</b> {booking.customerId || "N/A"}</p>
+                  </div>
 
-            <th className="p-4 text-left">
-              Owner Receives
-            </th>
+                  <div className="bg-gray-50 p-5 rounded-2xl">
+                    <h4 className="font-bold text-purple-700 mb-3">
+                      🅿️ Parking Details
+                    </h4>
+                    <p><b>Parking:</b> {booking.parkingTitle || "N/A"}</p>
+                    <p><b>Parking ID:</b> {booking.parkingId || "N/A"}</p>
+                    <p><b>Owner:</b> {booking.ownerName || "N/A"}</p>
+                    <p><b>Plan:</b> {booking.plan || "N/A"}</p>
+                  </div>
 
-            <th className="p-4 text-left">
-              Payment Status
-            </th>
+                  <div className="bg-gray-50 p-5 rounded-2xl">
+                    <h4 className="font-bold text-green-700 mb-3">
+                      💰 Refund Details
+                    </h4>
+                    <p><b>Customer Paid:</b> ₹{booking.customerPaidAmount || 0}</p>
+                    <p><b>Parking Amount:</b> ₹{booking.parkingAmount || 0}</p>
+                    <p><b>Platform Fee:</b> ₹{booking.platformFeeAmount || 0}</p>
+                    <p className="break-all mt-2">
+  <b>Payment ID:</b>{" "}
+  {booking.razorpayPaymentId ||
+    "Not Available"}
+</p>
 
-            <th className="p-4 text-left">
-  UTR
-</th>
+<p className="break-all">
+  <b>Refund ID:</b>{" "}
+  {booking.razorpayRefundId ||
+    "Not Generated"}
+</p>
 
-<th className="p-4 text-left">
-  Paid On
-</th>
 
-            <th className="p-4 text-left">
-              Action
-            </th>
 
-          </tr>
+<p className="break-all">
+  <b>Order ID:</b>{" "}
+  {booking.razorpayOrderId || "Not Available"}
+</p>
+                    <p className="text-red-600 font-bold">
+                      Refund Amount: ₹{booking.refundAmount || booking.parkingAmount || 0}
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      Platform fee is non-refundable.
+                    </p>
+                  </div>
 
-        </thead>
+                </div>
 
-        <tbody>
-
-          {bookings.map((booking) => (
-
-            <tr
-              key={booking.id}
-              className="border-b"
-            >
-
-              <td className="p-4">
-                {booking.bookingId}
-              </td>
-
-              <td className="p-4">
-                {booking.name}
-              </td>
-
-              <td className="p-4 font-bold text-black">
-                ₹{booking.customerPaidAmount || 0}
-              </td>
-
-              <td className="p-4 text-green-600 font-bold">
-                ₹{booking.platformFeeAmount || 0}
-              </td>
-
-              <td className="p-4 text-blue-600 font-bold">
-                ₹{booking.ownerReceivableAmount || 0}
-              </td>
-
-              <td className="p-4">
-
-<span
-  className={`px-3 py-1 rounded-full font-bold ${
-    booking.ownerPayoutStatus === "Paid"
-      ? "bg-green-100 text-green-700"
-      : "bg-yellow-100 text-yellow-700"
-  }`}
->
-  {booking.ownerPayoutStatus === "Paid"
-  ? "✅ Paid"
-  : "🟡 Pending"}
-</span>
-
-              </td>
-
-              <td className="p-4 font-mono text-sm">
-  {booking.paymentReference || "-"}
-</td>
-
-<td className="p-4">
-  {booking.ownerPaidDate
-    ? new Date(
-        booking.ownerPaidDate.seconds
-          ? booking.ownerPaidDate.seconds * 1000
-          : booking.ownerPaidDate
-      ).toLocaleDateString()
-    : "-"}
-</td>
-
-              <td className="p-4">
-
-               <button
-  className={`px-4 py-2 rounded-xl text-white font-bold ${
-    booking.ownerPayoutStatus === "Paid"
-      ? "bg-gray-500"
-      : "bg-green-600 hover:bg-green-700"
-  }`}
-disabled={
-  booking.ownerPayoutStatus === "Paid" ||
-  booking.bookingStatus !== "Completed"
-}
+                <button
   onClick={async () => {
+    const paymentId =
+      booking.razorpayPaymentId || "";
 
-    if (booking.ownerPayoutStatus === "Paid") {
+    const refundAmount = Number(
+      booking.refundAmount ||
+      booking.parkingAmount ||
+      0
+    );
+
+    const bookingDocumentId =
+      booking.bookingDocumentId || "";
+
+    if (!paymentId) {
+      alert(
+        "Razorpay Payment ID is not available. Automatic refund cannot be processed."
+      );
       return;
     }
 
-const utr = prompt(
-  "Enter UTR / Transaction Reference Number"
-);
+    if (!bookingDocumentId) {
+      alert(
+        "Linked booking document ID is not available. Refund cannot be synchronized."
+      );
+      return;
+    }
 
-if (!utr) {
-  alert("UTR is required.");
+    if (refundAmount <= 0) {
+      alert("Invalid refund amount.");
+      return;
+    }
+
+    const confirmRefund = confirm(
+      `Process refund of ₹${refundAmount}?\n\nPlatform fee will not be refunded.`
+    );
+
+    if (!confirmRefund) return;
+
+    try {
+      // Mark payment transaction as processing
+      await updateDoc(
+        doc(db, "payments", booking.id),
+        {
+          refundStatus: "Processing",
+          paymentStatus: "Refund Processing",
+          refundRequestedAt: new Date(),
+          updatedAt: new Date(),
+        }
+      );
+
+      // Keep booking document synchronized
+      await updateDoc(
+        doc(db, "bookings", bookingDocumentId),
+        {
+          refundStatus: "Processing",
+          paymentStatus: "Refund Processing",
+          refundRequestedAt: new Date(),
+        }
+      );
+
+      const response = await fetch(
+        "/api/refund",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            paymentId,
+            amount: refundAmount,
+            bookingId:
+              booking.bookingId ||
+              bookingDocumentId,
+          }),
+        }
+      );
+
+      const result =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !result.success
+      ) {
+        const failureData = {
+          refundStatus: "Failed",
+          paymentStatus: "Refund Failed",
+          refundFailedAt: new Date(),
+          refundFailureReason:
+            result.message ||
+            "Refund failed",
+          updatedAt: new Date(),
+        };
+
+        await updateDoc(
+          doc(db, "payments", booking.id),
+          failureData
+        );
+
+        await updateDoc(
+          doc(db, "bookings", bookingDocumentId),
+          {
+            refundStatus: "Failed",
+            paymentStatus: "Refund Failed",
+            refundFailedAt: new Date(),
+            refundFailureReason:
+              result.message ||
+              "Refund failed",
+          }
+        );
+
+        alert(
+          result.message ||
+          "Unable to process refund."
+        );
+
+        return;
+      }
+
+      const refund = result.refund;
+
+      const finalRefundStatus =
+        refund.status === "processed"
+          ? "Completed"
+          : "Processing";
+
+      const finalPaymentStatus =
+        refund.status === "processed"
+          ? "Refunded"
+          : "Refund Processing";
+
+      const paymentRefundData = {
+        refundStatus:
+          finalRefundStatus,
+
+        paymentStatus:
+          finalPaymentStatus,
+
+        refundAmount,
+
+        razorpayRefundId:
+          refund.id || "",
+
+        refundPaymentId:
+          refund.payment_id ||
+          paymentId,
+
+        refundSpeed:
+          refund.speed_processed ||
+          refund.speed_requested ||
+          "normal",
+
+        refundReference:
+          refund.id || "",
+
+        refundRequestedAt:
+          new Date(),
+
+        refundProcessedAt:
+          refund.status === "processed"
+            ? new Date()
+            : null,
+
+        platformFeeRefunded:
+          false,
+
+        refundRemarks:
+          "Parking amount refunded through Razorpay. Platform fee was not refunded.",
+
+        updatedAt:
+          new Date(),
+      };
+
+      // Update payments collection
+      await updateDoc(
+        doc(db, "payments", booking.id),
+        paymentRefundData
+      );
+
+      // Update linked booking document
+      await updateDoc(
+        doc(db, "bookings", bookingDocumentId),
+        {
+          refundStatus:
+            finalRefundStatus,
+
+          paymentStatus:
+            finalPaymentStatus,
+
+          refundAmount,
+
+          razorpayRefundId:
+            refund.id || "",
+
+          refundPaymentId:
+            refund.payment_id ||
+            paymentId,
+
+          refundSpeed:
+            refund.speed_processed ||
+            refund.speed_requested ||
+            "normal",
+
+          refundReference:
+            refund.id || "",
+
+          refundRequestedAt:
+            new Date(),
+
+          refundProcessedAt:
+            refund.status === "processed"
+              ? new Date()
+              : null,
+
+          platformFeeRefunded:
+            false,
+
+          refundRemarks:
+            "Parking amount refunded through Razorpay. Platform fee was not refunded.",
+        }
+      );
+
+      alert(
+        refund.status === "processed"
+          ? `Refund completed successfully.\nRefund ID: ${refund.id}`
+          : `Refund initiated successfully.\nRefund ID: ${refund.id}\nCurrent status: ${refund.status}`
+      );
+    } catch (error: any) {
+      console.error(
+        "Refund processing error:",
+        error
+      );
+
+      const errorMessage =
+        error?.message ||
+        "Unknown refund error";
+
+      await updateDoc(
+        doc(db, "payments", booking.id),
+        {
+          refundStatus: "Failed",
+          paymentStatus: "Refund Failed",
+          refundFailedAt: new Date(),
+          refundFailureReason:
+            errorMessage,
+          updatedAt: new Date(),
+        }
+      );
+
+      if (bookingDocumentId) {
+        await updateDoc(
+          doc(
+            db,
+            "bookings",
+            bookingDocumentId
+          ),
+          {
+            refundStatus: "Failed",
+            paymentStatus: "Refund Failed",
+            refundFailedAt:
+              new Date(),
+            refundFailureReason:
+              errorMessage,
+          }
+        );
+      }
+
+      alert(errorMessage);
+    }
+  }}
+  disabled={
+    booking.refundStatus ===
+      "Processing" ||
+    booking.refundStatus ===
+      "Completed"
+  }
+  className={`mt-6 px-6 py-3 rounded-2xl font-bold text-white ${
+    booking.refundStatus ===
+      "Processing" ||
+    booking.refundStatus ===
+      "Completed"
+      ? "bg-gray-400 cursor-not-allowed"
+      : "bg-green-600 hover:bg-green-700"
+  }`}
+>
+  {booking.refundStatus ===
+  "Processing"
+    ? "Refund Processing..."
+    : booking.refundStatus ===
+      "Completed"
+    ? "Refund Completed"
+    : "Process Refund"}
+</button>
+
+              </div>
+            ))}
+          </div>
+
+          {pendingRefunds.length > 3 && (
+            <button
+              onClick={() => setShowAllRefunds(!showAllRefunds)}
+              className="mt-6 bg-black text-white px-6 py-3 rounded-2xl font-bold"
+            >
+              {showAllRefunds ? "Show Less" : "View All Refund Requests"}
+            </button>
+          )}
+        </>
+      )}
+
+    </div>
+
+    {/* REFUND HISTORY */}
+
+<div className="bg-purple-50 border border-purple-300 rounded-3xl p-8 mb-12">
+
+  <div className="flex items-center justify-between mb-8">
+
+    <h2 className="text-3xl font-bold text-purple-700">
+      Refund History
+    </h2>
+
+    <div className="bg-purple-600 text-white px-5 py-3 rounded-2xl font-bold">
+      {refundHistory.length} Refunds
+    </div>
+
+  </div>
+
+  {refundHistory.length === 0 ? (
+
+    <p className="text-gray-500">
+      No processed refunds found.
+    </p>
+
+  ) : (
+
+    <>
+
+      <div className="overflow-x-auto">
+
+        <table className="w-full bg-white rounded-2xl overflow-hidden">
+
+          <thead>
+
+            <tr className="bg-gray-100">
+
+              <th className="p-4 text-left">
+                Booking
+              </th>
+
+              <th className="p-4 text-left">
+                Customer
+              </th>
+
+              <th className="p-4 text-left">
+                Payment ID
+              </th>
+
+              <th className="p-4 text-left">
+                Refund ID
+              </th>
+
+              <th className="p-4 text-left">
+                Amount
+              </th>
+
+              <th className="p-4 text-left">
+                Status
+              </th>
+
+              <th className="p-4 text-left">
+                Processed On
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            {visibleRefundHistory.map((booking) => (
+
+              <tr
+                key={booking.id}
+                className="border-b"
+              >
+
+                <td className="p-4">
+
+                  <p className="font-bold">
+                    {booking.bookingId || "N/A"}
+                  </p>
+
+                  <p className="text-sm text-gray-500">
+                    {booking.parkingTitle || ""}
+                  </p>
+
+                </td>
+
+                <td className="p-4">
+
+                  <p className="font-bold">
+                    {booking.customerName || "N/A"}
+                  </p>
+
+                  <p className="text-sm text-gray-500">
+                    {booking.customerPhone || ""}
+                  </p>
+
+                </td>
+
+                <td className="p-4 break-all text-sm">
+
+                  {booking.razorpayPaymentId ||
+                    booking.refundPaymentId ||
+                    "Not Available"}
+
+                </td>
+
+                <td className="p-4 break-all text-sm">
+
+                  {booking.razorpayRefundId ||
+                    booking.refundReference ||
+                    "Not Available"}
+
+                </td>
+
+                <td className="p-4 font-bold text-red-600">
+
+                  ₹{booking.refundAmount ||
+                    booking.parkingAmount ||
+                    0}
+
+                </td>
+
+                <td className="p-4">
+
+                  <span
+                    className={`px-3 py-1 rounded-full font-bold ${
+                      booking.refundStatus === "Completed"
+                        ? "bg-green-100 text-green-700"
+                        : booking.refundStatus === "Failed"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+
+                    {booking.refundStatus ||
+                      booking.paymentStatus ||
+                      "Unknown"}
+
+                  </span>
+
+                </td>
+
+                <td className="p-4">
+
+                  {booking.refundProcessedAt?.seconds
+                    ? new Date(
+                        booking.refundProcessedAt.seconds *
+                          1000
+                      ).toLocaleString()
+                    : booking.refundCompletedAt?.seconds
+                    ? new Date(
+                        booking.refundCompletedAt.seconds *
+                          1000
+                      ).toLocaleString()
+                    : booking.refundProcessedAt
+                    ? new Date(
+                        booking.refundProcessedAt
+                      ).toLocaleString()
+                    : booking.refundCompletedAt
+                    ? new Date(
+                        booking.refundCompletedAt
+                      ).toLocaleString()
+                    : booking.refundRequestedAt?.seconds
+                    ? new Date(
+                        booking.refundRequestedAt.seconds *
+                          1000
+                      ).toLocaleString()
+                    : "N/A"}
+
+                </td>
+
+              </tr>
+
+            ))}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+      {refundHistory.length > 5 && (
+
+        <button
+          onClick={() =>
+            setShowAllRefundHistory(
+              !showAllRefundHistory
+            )
+          }
+          className="mt-6 bg-black text-white px-6 py-3 rounded-2xl font-bold"
+        >
+
+          {showAllRefundHistory
+            ? "Show Less"
+            : "View All Refund History"}
+
+        </button>
+
+      )}
+
+    </>
+
+  )}
+
+</div>
+
+    {/* OWNER PAYOUTS */}
+
+    <div className="bg-blue-50 border border-blue-300 rounded-3xl p-8">
+
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-3xl font-bold text-blue-700">
+          Owner Payout Management
+        </h2>
+
+        <div className="bg-blue-600 text-white px-5 py-3 rounded-2xl font-bold">
+          {ownerPayouts.length} Payouts
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+
+        <table className="w-full bg-white rounded-2xl overflow-hidden">
+
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-4 text-left">Booking</th>
+              <th className="p-4 text-left">Customer</th>
+              <th className="p-4 text-left">Owner</th>
+              <th className="p-4 text-left">Parking</th>
+              <th className="p-4 text-left">Owner Receives</th>
+              <th className="p-4 text-left">Status</th>
+              <th className="p-4 text-left">Reference</th>
+              <th className="p-4 text-left">Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {visibleOwnerPayouts.map((booking) => (
+              <tr key={booking.id} className="border-b">
+
+                <td className="p-4 font-semibold">
+                  {booking.bookingId}
+                </td>
+
+                <td className="p-4">
+                  <p className="font-bold">{booking.customerName || "N/A"}</p>
+                  <p className="text-sm text-gray-500">{booking.customerPhone || ""}</p>
+                </td>
+
+                <td className="p-4">
+                  <p className="font-bold">{booking.ownerName || "N/A"}</p>
+                  <p className="text-sm text-gray-500">{booking.ownerPhone || ""}</p>
+                  <p className="text-sm text-gray-500">{booking.ownerEmail || ""}</p>
+                </td>
+
+                <td className="p-4">
+                  <p className="font-bold">{booking.parkingTitle || "N/A"}</p>
+                  <p className="text-sm text-gray-500">{booking.parkingId || ""}</p>
+                </td>
+
+                <td className="p-4 text-blue-700 font-bold">
+                  ₹{booking.ownerReceivableAmount || 0}
+                </td>
+
+                <td className="p-4">
+                  <span
+                    className={`px-3 py-1 rounded-full font-bold ${
+                      booking.ownerPayoutStatus === "Paid"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {booking.ownerPayoutStatus === "Paid"
+                      ? "✅ Paid"
+                      : "🟡 Pending"}
+                  </span>
+                </td>
+
+                <td className="p-4 font-mono text-sm">
+                 {booking.ownerPayoutReference ||
+  booking.paymentReference ||
+  "-"}
+                </td>
+
+                <td className="p-4">
+                  <button
+disabled={
+  booking.ownerPayoutStatus === "Paid" ||
+  !(
+    booking.bookingStatus === "Completed" ||
+    booking.bookingStatus === "Cancelled After Approval"
+  )
+}
+                    onClick={async () => {
+                      const utr = prompt(
+                        "Enter UTR / Transaction Reference Number"
+                      );
+
+                      if (!utr) {
+                        alert("UTR is required.");
+                        return;
+                      }
+
+                      const confirmPayment = confirm(
+                        `Release ₹${booking.ownerReceivableAmount} to ${booking.ownerName}?`
+                      );
+
+                      if (!confirmPayment) return;
+
+                      const paidAt = new Date();
+
+const bookingDocumentId =
+  booking.bookingDocumentId || "";
+
+if (!bookingDocumentId) {
+  alert(
+    "Linked booking document ID is missing. Payout cannot be synchronized."
+  );
   return;
 }
 
-const confirmPayment = confirm(
-  `Release ₹${booking.ownerReceivableAmount} to the parking owner?`
-);
-
-if (!confirmPayment) return;
-
-    try {
-
+// Update payment transaction
 await updateDoc(
-  doc(db, "bookings", booking.id),
+  doc(db, "payments", booking.id),
   {
     ownerPayoutStatus: "Paid",
-    paymentStatus: "Paid",
-    ownerPaidDate: new Date(),
+    ownerPaidAt: paidAt,
+    ownerPaidDate: paidAt,
+    ownerPayoutReference: utr,
+    paymentReference: utr,
+    updatedAt: paidAt,
+  }
+);
+
+// Update linked booking
+await updateDoc(
+  doc(
+    db,
+    "bookings",
+    bookingDocumentId
+  ),
+  {
+    ownerPayoutStatus: "Paid",
+    ownerPaidAt: paidAt,
+    ownerPaidDate: paidAt,
+    ownerPayoutReference: utr,
     paymentReference: utr,
   }
 );
 
-      alert("Payment Released Successfully.");
+alert(
+  "Owner payout marked as paid successfully."
+);
+                    }}
+                    className={`px-4 py-2 rounded-xl text-white font-bold ${
+booking.ownerPayoutStatus === "Paid" ||
+!(
+  booking.bookingStatus === "Completed" ||
+  booking.bookingStatus === "Cancelled After Approval"
+)
+  ? "bg-gray-400"
+  : "bg-green-600 hover:bg-green-700"
+                    }`}
+                  >
+{booking.ownerPayoutStatus === "Paid"
+  ? "Paid"
+  : booking.bookingStatus === "Completed" ||
+    booking.bookingStatus === "Cancelled After Approval"
+  ? "Release Payment"
+  : "Not Eligible"}
+                  </button>
+                </td>
 
-    } catch (error) {
+              </tr>
+            ))}
+          </tbody>
 
-      console.error(error);
+        </table>
 
-      alert("Unable to release payment.");
+      </div>
 
-    }
-
-  }}
->
-{
-  booking.ownerPayoutStatus === "Paid"
-    ? "Paid"
-    : booking.bookingStatus !== "Completed"
-    ? "Not Eligible"
-    : "Release Payment"
-}
-</button>
-
-              </td>
-
-            </tr>
-
-          ))}
-
-        </tbody>
-
-      </table>
+      {ownerPayouts.length > 5 && (
+        <button
+          onClick={() => setShowAllPayouts(!showAllPayouts)}
+          className="mt-6 bg-black text-white px-6 py-3 rounded-2xl font-bold"
+        >
+          {showAllPayouts ? "Show Less" : "View All Owner Payouts"}
+        </button>
+      )}
 
     </div>
 
@@ -2738,12 +3661,20 @@ owner.status === "Approved"
     try {
 
       await updateDoc(
-        doc(db, "ownerApplications", owner.id),
-        {
-          status: "Approved",
-          approvedAt: new Date(),
-        }
-      );
+  doc(db, "ownerApplications", owner.id),
+  {
+    status: "Approved",
+    approvedAt: new Date(),
+  }
+);
+
+await updateDoc(
+  doc(db, "users", owner.userUid),
+  {
+    isOwner: true,
+    ownerStatus: "Approved",
+  }
+);
 
       alert("Owner Approved Successfully.");
 

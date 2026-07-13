@@ -15,6 +15,9 @@ import {
   doc,
   updateDoc,
   addDoc,
+  query,
+  where,
+  increment,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -140,6 +143,25 @@ const rejectedBookings =
       "Rejected"
   );
 
+  const cancelledBeforeApprovalBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+      "Cancelled Before Approval"
+  );
+
+const cancelledAfterApprovalBookings =
+  bookings.filter(
+    (booking) =>
+      booking.bookingStatus ===
+      "Cancelled After Approval"
+  );
+
+const cancelledBookings = [
+  ...cancelledBeforeApprovalBookings,
+  ...cancelledAfterApprovalBookings,
+];
+
 const expiredBookings =
   bookings.filter(
     (booking) =>
@@ -151,89 +173,48 @@ const expiredBookings =
   const visibleBookings =
   bookingFilter === "Active"
     ? activeBookings
-    : bookingFilter ===
-      "Pending"
+    : bookingFilter === "Pending"
     ? pendingBookings
-    : bookingFilter ===
-      "Rejected"
+    : bookingFilter === "Rejected"
     ? rejectedBookings
+    : bookingFilter === "Cancelled"
+    ? cancelledBookings
     : expiredBookings;
 
 
   const qrRefs = useRef<any>({});
 
   useEffect(() => {
-
-    const fetchBookings = async () => {
-
-      const userUid =
-  localStorage.getItem(
-    "userUid"
-  );
-
-      const querySnapshot = await getDocs(
-        collection(db, "bookings")
-      );
-
-      const bookingData: any[] = [];
-
-      querySnapshot.forEach((docSnapshot) => {
-
-  const data =
-    docSnapshot.data();
-
-  if (
-  data.customerUid ===
-  userUid
-) {
-
-    if (
-      isExpired(
-        data.validTill
-      )
-    ) {
-
-      updateDoc(
-
-        doc(
-          db,
-          "parkings",
-          data.parkingId
-        ),
-
-        {
-          availability:
-            "Available",
-        }
-
-      ).catch(
-        console.error
-      );
-
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    if (!currentUser) {
+      router.replace("/login");
+      return;
     }
 
-    bookingData.push({
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("customerUid", "==", currentUser.uid)
+    );
 
-      id:
-        docSnapshot.id,
+    const querySnapshot = await getDocs(bookingsQuery);
 
-      ...data,
+    const bookingData: any[] = [];
 
+    querySnapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data();
+
+      bookingData.push({
+        id: docSnapshot.id,
+        ...data,
+      });
     });
 
-  }
+    setBookings(bookingData);
+    setLoading(false);
+  });
 
-});
-
- 
-
-      setBookings(bookingData);
-
-    };
-
-    fetchBookings();
-
-  }, []);
+  return () => unsubscribe();
+}, [auth, router]);
 
  useEffect(() => {
 
@@ -334,6 +315,21 @@ return (
   </button>
 
   <button
+  onClick={() =>
+    setBookingFilter("Cancelled")
+  }
+  className={`px-5 py-3 rounded-2xl font-bold ${
+    bookingFilter === "Cancelled"
+      ? "bg-orange-600 text-white"
+      : "bg-gray-200"
+  }`}
+>
+  🟠 Cancelled (
+  {cancelledBookings.length}
+  )
+</button>
+
+  <button
     onClick={() =>
       setBookingFilter("Expired")
     }
@@ -353,7 +349,7 @@ return (
         <div className="grid gap-6">
 
           {visibleBookings.map((booking) => (<div
-  key={booking.bookingId}
+key={booking.id}
   className="bg-white rounded-3xl shadow-xl overflow-hidden"
 >
 
@@ -439,6 +435,10 @@ alt={booking.parkingTitle}
     <h3 className="text-2xl font-bold">
       {booking.ownerName || "Owner"}
     </h3>
+
+    <p className="text-gray-500 text-sm">
+  Owner ID: {booking.ownerId || "N/A"}
+</p>
 
     
 
@@ -644,10 +644,9 @@ alt={booking.parkingTitle}
     qrRefs.current[booking.id] = el;
   }}
 value={JSON.stringify({
-  bookingId: booking.id,
-  parking:
-  booking.parkingTitle,
-  customer: booking.customerName,
+  bookingId: booking.bookingId,
+  customerId: booking.customerId,
+  parkingId: booking.parkingId,
   validTill: booking.validTill,
 })}
   size={180}
@@ -743,10 +742,10 @@ Please share further details.`
 
     try {
 
-      const amount =
-        Number(
-          booking.amount || 0
-        );
+const amount =
+  Number(
+    booking.customerPaidAmount || 0
+  );
 
       const options = {
 
@@ -781,24 +780,9 @@ Please share further details.`
                   currentExpiry
                 );
 
-              if (
-                booking.plan ===
-                "Monthly"
-              ) {
-
-                newExpiry.setDate(
-                  newExpiry.getDate() +
-                    30
-                );
-
-              } else {
-
-                newExpiry.setDate(
-                  newExpiry.getDate() +
-                    365
-                );
-
-              }
+              newExpiry.setDate(
+  newExpiry.getDate() + 30
+);
 
               await updateDoc(
 
@@ -826,10 +810,10 @@ Please share further details.`
 
                 {
 
-                  ownerEmail:
-                    booking.ownerEmail || "",
+                  ownerId:
+  booking.ownerId || "",
 
-                  title:
+                     title:
                     "Booking Renewed",
 
                   message:
@@ -909,55 +893,162 @@ Please share further details.`
 
 
 
-      <button
+      {(
+  booking.bookingStatus === "Pending Approval" ||
+  booking.bookingStatus === "Approved"
+) && (
+  <button
+    onClick={async () => {
+      try {
+        const isBeforeOwnerApproval =
+          booking.bookingStatus === "Pending Approval";
 
-        onClick={async () => {
+        const parkingAmount =
+          Number(booking.parkingAmount || 0);
 
-          try {
+        const platformFeeAmount =
+          Number(booking.platformFeeAmount || 0);
 
-            if (
-              booking.parkingId &&
-              booking.parkingId !== ""
-            ) {
+        const ownerReceivableAmount =
+          Number(
+            booking.ownerReceivableAmount ||
+            booking.parkingAmount ||
+            0
+          );
 
-              await updateDoc(
-                doc(
-                  db,
-                  "parkings",
-                  booking.parkingId
-                ),
-                {
-                  availability: "Available",
-                }
-              );
+        const confirmationMessage =
+          isBeforeOwnerApproval
+            ? `Cancel this booking?\n\nParking amount ₹${parkingAmount} will be refunded.\nPlatform fee ₹${platformFeeAmount} is non-refundable.`
+            : `Cancel this approved booking?\n\nNo refund will be provided because the owner has already approved it.\n₹${ownerReceivableAmount} will remain payable to the parking owner.`;
 
+        const confirmCancellation =
+          window.confirm(confirmationMessage);
+
+        if (!confirmCancellation) return;
+
+        if (isBeforeOwnerApproval) {
+          await updateDoc(
+            doc(db, "bookings", booking.id),
+            {
+              bookingStatus: "Cancelled Before Approval",
+              ownerApprovalStatus: "Cancelled",
+              paymentStatus: "Refund Pending",
+
+              cancellationType: "Before Owner Approval",
+              cancelledBy: "Customer",
+              cancelledAt: new Date(),
+
+              refundAmount: parkingAmount,
+              refundStatus: "Pending",
+              platformFeeAmount,
+              platformFeeRefunded: false,
+
+              ownerPayoutStatus: "Not Applicable",
+
+              refundRemarks:
+                "Customer cancelled before owner approval. Parking amount refund pending. Platform fee is non-refundable.",
             }
+          );
 
-            await deleteDoc(
-              doc(db, "bookings", booking.id)
+          if (booking.parkingId) {
+            await updateDoc(
+              doc(db, "parkings", booking.parkingId),
+              {
+                availableSlots: increment(1),
+                occupiedSlots: increment(-1),
+                availability: "Available",
+              }
             );
-
-            setBookings(
-              bookings.filter(
-                (item) =>
-                  item.id !== booking.id
-              )
-            );
-
-            alert("Booking Cancelled");
-
-          } catch (error) {
-
-            console.log(error);
-
           }
 
-        }}
+          setBookings((currentBookings) =>
+            currentBookings.map((item) =>
+              item.id === booking.id
+                ? {
+                    ...item,
+                    bookingStatus: "Cancelled Before Approval",
+                    ownerApprovalStatus: "Cancelled",
+                    paymentStatus: "Refund Pending",
+                    cancellationType: "Before Owner Approval",
+                    refundAmount: parkingAmount,
+                    refundStatus: "Pending",
+                    ownerPayoutStatus: "Not Applicable",
+                  }
+                : item
+            )
+          );
 
-        className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-bold"
-      >
-        Cancel Booking
-      </button>
+          alert(
+            `Booking cancelled successfully.\n\nRefund pending: ₹${parkingAmount}\nPlatform fee ₹${platformFeeAmount} is non-refundable.`
+          );
+        } else {
+          await updateDoc(
+            doc(db, "bookings", booking.id),
+            {
+              bookingStatus: "Cancelled After Approval",
+              ownerApprovalStatus: "Approved",
+              paymentStatus: "Paid",
+
+              cancellationType: "After Owner Approval",
+              cancelledBy: "Customer",
+              cancelledAt: new Date(),
+
+              refundAmount: 0,
+              refundStatus: "Not Applicable",
+              platformFeeRefunded: false,
+
+              ownerPayoutStatus: "Pending",
+              ownerReceivableAmount,
+
+              cancellationRemarks:
+                "Customer cancelled after owner approval. No customer refund. Parking amount remains payable to the owner.",
+            }
+          );
+
+          if (booking.parkingId) {
+            await updateDoc(
+              doc(db, "parkings", booking.parkingId),
+              {
+                availableSlots: increment(1),
+                occupiedSlots: increment(-1),
+                availability: "Available",
+              }
+            );
+          }
+
+          setBookings((currentBookings) =>
+            currentBookings.map((item) =>
+              item.id === booking.id
+                ? {
+                    ...item,
+                    bookingStatus: "Cancelled After Approval",
+                    paymentStatus: "Paid",
+                    cancellationType: "After Owner Approval",
+                    refundAmount: 0,
+                    refundStatus: "Not Applicable",
+                    ownerPayoutStatus: "Pending",
+                    ownerReceivableAmount,
+                  }
+                : item
+            )
+          );
+
+          alert(
+            `Booking cancelled after owner approval.\n\nNo refund is applicable.\n₹${ownerReceivableAmount} remains payable to the parking owner.`
+          );
+        }
+      } catch (error) {
+        console.error("Cancellation error:", error);
+        alert("Unable to cancel booking.");
+      }
+    }}
+    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-4 rounded-2xl font-bold"
+  >
+    {booking.bookingStatus === "Approved"
+      ? "Cancel Booking — No Refund"
+      : "Cancel Booking"}
+  </button>
+)}
 
     </div>
 

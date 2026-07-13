@@ -19,6 +19,8 @@ import {
   onSnapshot,
   query,
   where,
+  serverTimestamp,
+  getDocs,
 } from "firebase/firestore";
 
 import {
@@ -38,8 +40,6 @@ export default function AddParkingPage() {
   const [monthlyPrice, setMonthlyPrice] =
     useState("");
 
-  const [yearlyPrice, setYearlyPrice] =
-    useState("");
 
     const [totalSlots, setTotalSlots] =
   useState("1");
@@ -109,12 +109,11 @@ useEffect(() => {
   const q = query(
 
     collection(db, "ownerApplications"),
-
-    where(
-      "userEmail",
-      "==",
-      user.email
-    )
+where(
+  "userUid",
+  "==",
+  user.uid
+)
 
   );
 
@@ -329,8 +328,12 @@ if (ownerStatus === "Pending") {
             placeholder="Parking Title"
             value={title}
             onChange={(e) =>
-              setTitle(e.target.value)
-            }
+  setTitle(
+    e.target.value
+      .replace(/[^A-Za-z0-9\s]/g, "")
+      .slice(0, 80)
+  )
+}
             className="border p-4 rounded-2xl"
           />
 
@@ -340,9 +343,13 @@ if (ownerStatus === "Pending") {
             type="text"
             placeholder="Parking Location"
             value={location}
-            onChange={(e) =>
-              setLocation(e.target.value)
-            }
+onChange={(e) =>
+  setLocation(
+    e.target.value
+      .replace(/[^A-Za-z0-9,\-./() ]/g, "")
+      .slice(0, 150)
+  )
+}
             className="border p-4 rounded-2xl"
           />
 
@@ -352,40 +359,29 @@ if (ownerStatus === "Pending") {
             type="number"
             placeholder="Monthly Price"
             value={monthlyPrice}
-            onChange={(e) =>
-              setMonthlyPrice(
-                e.target.value
-              )
-            }
+onChange={(e) =>
+setMonthlyPrice(
+e.target.value
+.replace(/\D/g,"")
+.slice(0,6)
+)
+}
             className="border p-4 rounded-2xl"
           />
 
-          {/* YEARLY */}
-
-          <input
-            type="number"
-            placeholder="Yearly Price"
-            value={yearlyPrice}
-            onChange={(e) =>
-              setYearlyPrice(
-                e.target.value
-              )
-            }
-            className="border p-4 rounded-2xl"
-          />
+          
 
           {/* TOTAL PARKING SLOTS */}
 
+
+
 <input
-  type="number"
-  min="1"
-  placeholder="Total Parking Slots"
-  value={totalSlots}
-  onChange={(e) =>
-    setTotalSlots(e.target.value)
-  }
-  className="border p-4 rounded-2xl"
+  type="text"
+  value="1"
+  readOnly
+  className="border p-4 rounded-2xl bg-gray-100 text-gray-600 cursor-not-allowed"
 />
+
 
           {/* TYPE */}
 
@@ -500,15 +496,37 @@ if (ownerStatus === "Pending") {
             multiple
             onChange={(e) => {
 
-              if (e.target.files) {
+if (!e.target.files) return;
 
-                setImages(
-                  Array.from(
-                    e.target.files
-                  )
-                );
+const files = Array.from(e.target.files);
 
-              }
+for (const file of files) {
+
+  if (file.size > 5 * 1024 * 1024) {
+
+    alert("Each image must be below 5MB");
+
+    return;
+
+  }
+
+  if (
+    ![
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ].includes(file.type)
+  ) {
+
+    alert("Only JPG, PNG and WEBP images are allowed");
+
+    return;
+
+  }
+
+}
+
+setImages(files);
 
             }}
             className="border p-4 rounded-2xl w-full"
@@ -521,11 +539,15 @@ if (ownerStatus === "Pending") {
         <textarea
           placeholder="Parking Description"
           value={description}
-          onChange={(e) =>
-            setDescription(
-              e.target.value
-            )
-          }
+onChange={(e)=>{
+
+if(e.target.value.length<=500){
+
+setDescription(e.target.value);
+
+}
+
+}}
           className="border p-4 rounded-2xl w-full mt-8 h-40"
         ></textarea>
 
@@ -540,6 +562,38 @@ if (ownerStatus === "Pending") {
             try {
 
               setLoading(true);
+
+              if(title.trim().length < 5){
+
+alert("Parking title should contain at least 5 characters");
+
+setLoading(false);
+
+return;
+
+}
+
+if(location.trim().length < 3){
+
+alert("Please enter a complete parking location");
+
+setLoading(false);
+
+return;
+
+}
+
+if(Number(monthlyPrice) < 100){
+
+alert("Monthly price should be at least ₹100");
+
+setLoading(false);
+
+return;
+
+}
+
+
 
               if (
                 !title ||
@@ -615,24 +669,48 @@ if (ownerStatus === "Pending") {
 
               }
 
+              // Generate Unique Parking ID
+const parkingId =
+  "PK" +
+  Date.now().toString().slice(-8);
+
               // FIRESTORE SAVE
 
-              const newParking = {
+              const formattedTitle = title
+.split(" ")
+.map(
+word =>
+word.charAt(0).toUpperCase() +
+word.slice(1).toLowerCase()
+)
+.join(" ");
 
-                title,
+              const newParking = {
+                
+                parkingId,
+
+parkingCode: parkingId,
+
+                title: formattedTitle,
 
                 location,
 
                 monthlyPrice,
 
-                yearlyPrice,
-                totalSlots:
-  Number(totalSlots),
+totalSlots: Number(totalSlots),
 
 occupiedSlots: 0,
 
-availableSlots:
-  Number(totalSlots),
+availableSlots: Number(totalSlots),
+
+slots: Array.from(
+  { length: Number(totalSlots) },
+  (_, index) => ({
+    slotId: `S${index + 1}`,
+    slotName: `S${index + 1}`,
+    status: "Available",
+  })
+),
 
                 description,
 
@@ -650,18 +728,18 @@ availableSlots:
 
                 longitude,
 
-                status:
-                  "Pending",
+                status: "Pending",
 
-                availability:
-                  "Available",
+availability: "Pending Approval",
 
-                featured: false,
+featured: false,
 
-                verified: false,
+verified: false,
 
                 ownerUid:
                   user.uid,
+
+ownerId: userData?.userId || "",
 
                 ownerName:
                   userData?.name || "",
@@ -678,10 +756,27 @@ ownerPhoto:
                 ownerCity:
                   userData?.city || "",
 
-                createdAt:
-                  new Date(),
+               createdAt: serverTimestamp(),
 
               };
+
+              const duplicateQuery = query(
+collection(db,"parkings"),
+where("ownerUid", "==", user.uid),
+where("title","==",title)
+);
+
+const duplicate = await getDocs(duplicateQuery);
+
+if(!duplicate.empty){
+
+alert("Parking with this name already exists.");
+
+setLoading(false);
+
+return;
+
+}
 
               await addDoc(
 
@@ -706,7 +801,7 @@ ownerPhoto:
 
               setMonthlyPrice("");
 
-              setYearlyPrice("");
+
               setTotalSlots("1");
 
               setDescription("");

@@ -16,8 +16,17 @@ import {
   getDocs,
   orderBy,
   query,
+  where,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+import {
+  db,
+  storage,
+} from "@/lib/firebase";
 
 
 
@@ -52,33 +61,29 @@ const [message, setMessage] = useState("");
 const [category, setCategory] =
   useState("");
 
+  const [screenshot, setScreenshot] = useState<File | null>(null);
+
 const [tickets, setTickets] = useState<any[]>([]);
 const [loading, setLoading] = useState(false);
 
   const loadTickets = async () => {
-    const email = localStorage.getItem("userEmail");
-
-
-
-
-
-    if (!email) return;
+const userId = localStorage.getItem("userId");
+if (!userId) return;
 
     const q = query(
-      collection(db, "supportTickets"),
-      orderBy("createdAt", "desc")
-    );
+  collection(db, "supportTickets"),
+  where("userId", "==", userId),
+  orderBy("createdAt", "desc")
+);
 
-    const snapshot = await getDocs(q);
+const snapshot = await getDocs(q);
 
-    const data = snapshot.docs
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-      .filter((ticket: any) => ticket.userEmail === email);
+const data = snapshot.docs.map((doc) => ({
+  id: doc.id,
+  ...doc.data(),
+}));
 
-    setTickets(data);
+setTickets(data);
   };
 
   useEffect(() => {
@@ -89,29 +94,56 @@ const [loading, setLoading] = useState(false);
     const email = localStorage.getItem("userEmail");
     const name =
       localStorage.getItem("userName") || "User";
+      const userId = localStorage.getItem("userId");
 
-    if (!email) {
-      alert("Please Login");
-      return;
-    }
+if (!userId) {
+  alert("Please Login");
+  return;
+}
 
     if (
-  !subject ||
-  !message ||
+
+  !subject.trim() ||
+
+  !message.trim() ||
+
   !category
+
 ) {
-      alert("Please fill all fields");
-      return;
-    }
+
+  alert("Please fill all required fields.");
+
+  return;
+
+}
+
+if(subject.trim().length < 5){
+
+alert("Subject should contain at least 5 characters.");
+
+return;
+
+}
+
+if(message.trim().length < 20){
+
+alert("Please describe your issue in at least 20 characters.");
+
+return;
+
+}
 
     setLoading(true);
 
     try {
-      const ticketId =
-        "TKT-" +
-        Math.floor(
-          100000 + Math.random() * 900000
-        );
+const ticketId =
+
+`TKT-${new Date()
+.getFullYear()}-${Date.now()
+.toString()
+.slice(-6)}`;
+
+
 
         let priority = "Medium";
 
@@ -129,17 +161,64 @@ if (
   priority = "Low";
 }
 
+const duplicate = tickets.find(
+
+(ticket:any)=>
+
+ticket.subject.toLowerCase().trim()===subject.toLowerCase().trim()
+
+&&
+
+ticket.status !== "Resolved"
+
+);
+
+if(duplicate){
+
+alert("You already have an open ticket with the same subject.");
+
+setLoading(false);
+
+return;
+
+}
+
+let screenshotURL = "";
+
+if (screenshot) {
+
+  const imageRef = ref(
+
+    storage,
+
+    `support-screenshots/${Date.now()}-${screenshot.name}`
+
+  );
+
+  await uploadBytes(
+    imageRef,
+    screenshot
+  );
+
+  screenshotURL =
+    await getDownloadURL(imageRef);
+
+}
+
 await addDoc(
   collection(db, "supportTickets"),
   {
     ticketId,
     userName: name,
     userEmail: email,
+    userId,
 
     category,
 
-    subject,
-    message,
+subject: subject.trim(),
+
+message: message.trim(),
+screenshot: screenshotURL,
 
           status: "Open",
           priority,
@@ -157,6 +236,7 @@ await addDoc(
 
 setSubject("");
 setMessage("");
+setScreenshot(null);
 setCategory("");
 
       loadTickets();
@@ -222,9 +302,13 @@ if (pageLoading) {
             type="text"
             placeholder="Subject"
             value={subject}
-            onChange={(e) =>
-              setSubject(e.target.value)
-            }
+onChange={(e) =>
+  setSubject(
+    e.target.value
+      .replace(/[^A-Za-z0-9\s.,()\-]/g, "")
+      .slice(0, 80)
+  )
+}
             className="w-full border p-4 rounded-2xl mb-4"
           />
 
@@ -268,16 +352,77 @@ if (pageLoading) {
     Technical Issue
   </option>
 
+  <option value="Others">
+
+Others
+
+</option>
+
 </select>
 
           <textarea
             placeholder="Describe your issue"
             value={message}
-            onChange={(e) =>
-              setMessage(e.target.value)
-            }
+onChange={(e) => {
+
+  if (e.target.value.length <= 1000) {
+
+    setMessage(e.target.value);
+
+    
+
+  }
+
+}}
             className="w-full border p-4 rounded-2xl h-40 mb-4"
           />
+
+          <p className="text-sm text-gray-500 mt-2 text-right">
+
+{message.length}/1000 Characters
+
+</p>
+
+          <div className="mt-5">
+
+  <label className="block font-bold mb-2">
+
+    Upload Screenshot (Optional)
+
+  </label>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) => {
+
+      const file = e.target.files?.[0];
+
+      if (!file) return;
+
+      if (file.size > 5 * 1024 * 1024) {
+
+        alert("Image should be below 5MB.");
+
+        return;
+
+      }
+
+      if (!file.type.startsWith("image/")) {
+
+        alert("Only image files are allowed.");
+
+        return;
+
+      }
+
+      setScreenshot(file);
+
+    }}
+    className="w-full border p-4 rounded-2xl"
+  />
+
+</div>
 
           <button
             onClick={submitTicket}
@@ -337,6 +482,20 @@ if (pageLoading) {
                   <p className="mb-3">
                     {ticket.message}
                   </p>
+
+                  {ticket.screenshot && (
+
+  <div className="my-4">
+
+    <img
+      src={ticket.screenshot}
+      alt="Support Screenshot"
+      className="w-72 rounded-2xl border shadow"
+    />
+
+  </div>
+
+)}
 
                   <div className="bg-gray-100 p-3 rounded-xl">
 

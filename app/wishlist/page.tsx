@@ -24,6 +24,8 @@ const auth = getAuth(app);
 
 const [loading, setLoading] = useState(true);
 
+const [user, setUser] = useState<any>(null);
+
   const [items, setItems] =
     useState<any[]>([]);
 
@@ -39,7 +41,8 @@ const [loading, setLoading] = useState(true);
 
     }
 
-    setLoading(false);
+setUser(user);
+setLoading(false);
 
   });
 
@@ -52,13 +55,7 @@ const [loading, setLoading] = useState(true);
     const fetchWishlist =
       async () => {
 
-        const userEmail =
-          localStorage.getItem(
-            "userEmail"
-          );
-
-        if (!userEmail)
-          return;
+if (!user) return;
 
         const q = query(
 
@@ -67,11 +64,11 @@ const [loading, setLoading] = useState(true);
             "wishlist"
           ),
 
-          where(
-            "userEmail",
-            "==",
-            userEmail
-          )
+where(
+  "userUid",
+  "==",
+  user.uid
+)
 
         );
 
@@ -100,7 +97,7 @@ const [loading, setLoading] = useState(true);
 
     fetchWishlist();
 
-  }, []);
+}, [user]);
 
   const removeWishlist =
   async (id: string) => {

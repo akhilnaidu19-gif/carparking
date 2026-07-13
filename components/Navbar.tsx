@@ -10,6 +10,8 @@ import {
   query,
   where,
   getDocs,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 
 
@@ -18,6 +20,8 @@ export default function Navbar() {
 const [user, setUser] = useState<any>(null);
 
 const [userPhoto, setUserPhoto] = useState("");
+
+const [userData, setUserData] = useState<any>(null);
 
 const [ownerStatus, setOwnerStatus] =
 useState("");
@@ -33,18 +37,25 @@ const loadUserPhoto = async () => {
 
   if (!currentUser) return;
 
-  const q = query(
-    collection(db, "users"),
-    where("uid", "==", currentUser.uid)
+  const userRef = doc(
+    db,
+    "users",
+    currentUser.uid
   );
 
-  const snapshot = await getDocs(q);
+  const userSnap = await getDoc(userRef);
 
-  if (!snapshot.empty) {
+  if (userSnap.exists()) {
 
-    const data = snapshot.docs[0].data();
+const data = userSnap.data();
 
-    setUserPhoto(data.photo || "");
+setUserData(data);
+
+setUserPhoto(
+  data.photoURL ||
+  data.photo ||
+  ""
+);
 
   }
 
@@ -61,7 +72,11 @@ const loadOwnerStatus = async () => {
 
   const q = query(
     collection(db, "ownerApplications"),
-    where("userEmail", "==", currentUser.email)
+where(
+  "userUid",
+  "==",
+  currentUser.uid
+)
   );
 
   const snapshot = await getDocs(q);
@@ -176,25 +191,33 @@ loadOwnerStatus();
 
   <div className="relative group">
 
-    <img
-  src={
-    userPhoto ||
-    "https://via.placeholder.com/50"
-  }
-      alt="Profile"
-      className="w-12 h-12 rounded-full object-cover border-2 border-green-500 cursor-pointer"
-    />
+{userPhoto ? (
+  <img
+    src={userPhoto}
+    alt="Profile"
+    className="w-12 h-12 rounded-full object-cover border-2 border-green-500 cursor-pointer"
+  />
+) : (
+  <div className="w-12 h-12 rounded-full bg-green-600 border-2 border-green-500 flex items-center justify-center text-white font-bold text-lg cursor-pointer">
+{(userData?.name || "User")
+  .split(" ")
+  .map((word: string) => word[0])
+  .join("")
+  .substring(0, 2)
+  .toUpperCase()}
+  </div>
+)}
 
     <div className="absolute right-0 top-14 w-64 bg-white text-black rounded-2xl shadow-2xl p-4 hidden group-hover:block z-50">
 
       <div className="mb-4">
 
         <h3 className="font-bold">
-          {user.displayName || "User"}
+{userData?.name || "User"}
         </h3>
 
         <p className="text-sm text-gray-500">
-          {user.email}
+{userData?.email || user.phoneNumber || ""}
         </p>
 
       </div>

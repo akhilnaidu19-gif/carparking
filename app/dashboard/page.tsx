@@ -77,7 +77,7 @@ const [
 
       const q = query(
   collection(db, "ownerApplications"),
-  where("userUid", "==", currentUser.uid),
+where("userUid", "==", currentUser.uid),
   where("status", "==", "Approved")
 );
 
@@ -115,6 +115,7 @@ if (snapshot.empty) {
 
       collection(db, "parkings"),
 
+
 where(
   "ownerUid",
   "==",
@@ -151,22 +152,23 @@ where(
 
           // FETCH BOOKINGS
 
-          const bookingsSnapshot = await getDocs(
-  collection(db, "bookings")
+          const bookingsQuery = query(
+  collection(db, "bookings"),
+where(
+  "ownerUid",
+  "==",
+  user.uid
+)
 );
+
+const bookingsSnapshot = await getDocs(bookingsQuery);
 
 const bookingData: any[] = [];
 let total = 0;
 
-const ownerUids = parkingData.map(
-  (parking) => parking.ownerUid
-);
-
 bookingsSnapshot.forEach((bookingDoc) => {
 
   const data = bookingDoc.data();
-
-  if (ownerUids.includes(data.ownerUid)) {
 
     bookingData.push({
       id: bookingDoc.id,
@@ -179,7 +181,7 @@ bookingsSnapshot.forEach((bookingDoc) => {
       );
     }
 
-  }
+  
 
 });
 
@@ -215,11 +217,11 @@ setEarnings(total);
       "notifications"
     ),
 
-    where(
-      "ownerEmail",
-      "==",
-      user.email
-    )
+where(
+  "ownerUid",
+  "==",
+  user.uid
+)
 
   );
 
@@ -259,18 +261,17 @@ setEarnings(total);
   // STATS
 
 const totalSlots =
-  parkings.reduce(
-
-    (total, parking) =>
-
-      total +
-      Number(
-        parking.totalSlots || 0
-      ),
-
-    0
-
-  );
+  parkings
+    .filter(
+      (parking) =>
+        parking.status === "Approved" ||
+        parking.availability === "Occupied"
+    )
+    .reduce(
+      (total, parking) =>
+        total + Number(parking.totalSlots || 0),
+      0
+    );
 
 const occupiedSlots =
   parkings.reduce(
@@ -287,18 +288,17 @@ const occupiedSlots =
   );
 
 const availableSlots =
-  parkings.reduce(
-
-    (total, parking) =>
-
-      total +
-      Number(
-        parking.availableSlots || 0
-      ),
-
-    0
-
-  );
+  parkings
+    .filter(
+      (parking) =>
+        parking.status === "Approved" &&
+        parking.availability === "Available"
+    )
+    .reduce(
+      (total, parking) =>
+        total + Number(parking.availableSlots || 0),
+      0
+    );
 
   const activeBookings =
     bookings.filter(
@@ -307,19 +307,34 @@ const availableSlots =
         "Paid"
     ).length;
 
+    const totalValidBookings = bookings.filter(
+  (booking) =>
+    booking.bookingStatus === "Pending Approval" ||
+    booking.bookingStatus === "Approved" ||
+    booking.bookingStatus === "Completed"
+).length;
+
   const featuredListings =
     parkings.filter(
       (item) =>
         item.featured === true
     ).length;
 
-    const totalCustomers =
-  new Set(
-    bookings.map(
-      (item) =>
-        item.customerUid
+const totalCustomers = new Set(
+  bookings
+    .filter(
+      (booking) =>
+        booking.bookingStatus === "Pending Approval" ||
+        booking.bookingStatus === "Approved" ||
+        booking.bookingStatus === "Completed"
     )
-  ).size;
+    .map(
+      (booking) =>
+        booking.customerUid ||
+        booking.customerId
+    )
+    .filter(Boolean)
+).size;
 
   const occupancyRate =
   totalSlots > 0
@@ -391,20 +406,22 @@ const rejectedBookings =
 
   const pendingPayout = bookings.reduce(
   (total, booking) => {
+    const eligibleBookingStatus =
+      booking.bookingStatus === "Completed" ||
+      booking.bookingStatus === "Cancelled After Approval";
 
-    if (
-      booking.ownerPayoutStatus === "Pending"
-    ) {
+    const eligibleForPayout =
+      eligibleBookingStatus &&
+      booking.ownerPayoutStatus === "Pending";
+
+    if (eligibleForPayout) {
       return (
         total +
-        Number(
-          booking.ownerReceivableAmount || 0
-        )
+        Number(booking.ownerReceivableAmount || 0)
       );
     }
 
     return total;
-
   },
   0
 );
@@ -441,6 +458,12 @@ const visibleBookings =
       bookingSearch.toLowerCase();
 
     return (
+
+      booking.customerId
+  ?.toLowerCase()
+  .includes(search)
+
+||
 
       booking.customerName
         ?.toLowerCase()
@@ -612,13 +635,13 @@ const visibleBookings =
 
           <div className="bg-gradient-to-r from-cyan-500 to-cyan-600 text-white p-8 rounded-3xl shadow-xl">
 
-  <p className="text-lg mb-3">
-    Customers
-  </p>
+<p className="text-lg mb-3">
+  Total Bookings
+</p>
 
-  <h2 className="text-5xl font-bold">
-    {totalCustomers}
-  </h2>
+<h2 className="text-5xl font-bold">
+  {totalValidBookings}
+</h2>
 
 </div>
 
@@ -799,7 +822,7 @@ const visibleBookings =
 
             <p className="text-gray-600">
 
-              {booking.title}
+              {booking.parkingTitle || "Parking Booking"}
 
             </p>
 
@@ -915,50 +938,58 @@ const visibleBookings =
 
                     {/* BADGES */}
 
-                    <div className="flex flex-wrap gap-3 mb-5">
+                    {/* ADMIN APPROVAL STATUS */}
 
-                      {parking.featured && (
+<span
+  className={`px-4 py-2 rounded-xl text-white font-bold ${
+    parking.status === "Approved"
+      ? "bg-green-500"
+      : parking.status === "Rejected"
+      ? "bg-red-600"
+      : "bg-yellow-500"
+  }`}
+>
+  Admin: {parking.status}
+</span>
 
-                        <span className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold">
+{/* PARKING AVAILABILITY */}
 
-                          Featured
+<span
+  className={`px-4 py-2 rounded-xl text-white font-bold ${
+    parking.availability === "Available"
+      ? "bg-green-500"
+      : parking.availability === "Occupied"
+      ? "bg-red-500"
+      : parking.availability === "Booking Pending"
+      ? "bg-orange-500"
+      : "bg-gray-500"
+  }`}
+>
+  {parking.availability}
+</span>
 
-                        </span>
 
-                      )}
 
-                      {parking.verified && (
+                    <h3 className="text-3xl font-bold mt-3 mb-5">
+  {parking.title}
+</h3>
 
-                        <span className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold">
+{parking.status === "Rejected" &&
+ parking.adminRemarks && (
 
-                          Verified
+  <div className="bg-red-50 border border-red-300 rounded-2xl p-4 mt-4 mb-4">
 
-                        </span>
+    <h4 className="font-bold text-red-700 mb-2">
+      ❌ Rejected By Admin
+    </h4>
 
-                      )}
+    <p className="text-gray-700">
+      {parking.adminRemarks}
+    </p>
 
-                      <span
-                        className={`px-4 py-2 rounded-xl text-white font-bold ${
-                          parking.availability ===
-                          "Available"
-                            ? "bg-green-500"
-                            : "bg-red-500"
-                        }`}
-                      >
+  </div>
 
-                        {
-                          parking.availability
-                        }
-
-                      </span>
-
-                    </div>
-
-                    <h3 className="text-3xl font-bold mb-3">
-
-                      {parking.title}
-
-                    </h3>
+)}
 
                     <p className="text-gray-500 text-lg mb-4">
 
@@ -1022,12 +1053,24 @@ const visibleBookings =
 
                     <div className="flex flex-wrap gap-4">
 
+{(
+  parking.status === "Pending" ||
+  parking.status === "Rejected"
+) ? (
   <a
-    href={`/owner/edit-listing/${parking.id}`}
-    className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-bold"
+    href={`/edit-parking/${parking.id}`}
+    className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-bold hover:bg-blue-700 transition"
   >
     ✏️ Edit Listing
   </a>
+) : (
+  <button
+    disabled
+    className="bg-gray-400 text-white px-6 py-4 rounded-2xl font-bold cursor-not-allowed opacity-70"
+  >
+    🔒 Edit Locked
+  </button>
+)}
 
   <a
     href={`/parking/${parking.id}`}
@@ -1050,11 +1093,41 @@ const visibleBookings =
     🗺 View Map
   </a>
 
+{(
+  parking.status === "Pending" ||
+  parking.status === "Rejected"
+) ? (
   <button
-    className="bg-red-500 text-white px-6 py-4 rounded-2xl font-bold"
+    onClick={async () => {
+      const confirmDelete = confirm(
+        "Are you sure you want to delete this parking listing?"
+      );
+
+      if (!confirmDelete) return;
+
+      try {
+        await deleteDoc(
+          doc(db, "parkings", parking.id)
+        );
+
+        alert("Parking listing deleted successfully.");
+      } catch (error) {
+        console.error(error);
+        alert("Unable to delete parking listing.");
+      }
+    }}
+    className="bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-2xl font-bold transition"
   >
     🗑 Delete
   </button>
+) : (
+  <button
+    disabled
+    className="bg-gray-400 text-white px-6 py-4 rounded-2xl font-bold cursor-not-allowed opacity-70"
+  >
+    🔒 Delete Locked
+  </button>
+)}
 
 </div>
 
@@ -1214,7 +1287,7 @@ const visibleBookings =
 
                     {/* STATUS */}
 
-                    <div className="flex flex-wrap gap-3 mb-5">
+                    <div className="flex flex-wrap gap-3 mb-8">
 
   <span className="bg-green-500 text-white px-4 py-2 rounded-xl font-bold">
     {booking.paymentStatus}
@@ -1240,72 +1313,150 @@ const visibleBookings =
 
                     <h3 className="text-3xl font-bold mb-3">
 
-                      {booking.title}
+                      {booking.parkingTitle || "Parking Booking"}
 
                     </h3>
 
                     <p className="text-gray-500 text-lg mb-5">
 
-                      {booking.location}
+                      {booking.parkingLocation || "Location Not Available"}
 
                     </p>
 
-                    {/* CUSTOMER */}
+                    {/* PARKING INFORMATION */}
 
-                    {/* CUSTOMER & VEHICLE */}
+<div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-6">
 
-<div className="grid md:grid-cols-2 gap-5 mb-6">
+  <h3 className="text-xl font-bold text-blue-700 mb-4">
+    🅿️ Parking Information
+  </h3>
 
-  <div className="bg-white p-5 rounded-2xl">
+  <div className="grid md:grid-cols-2 gap-4">
 
-    <h3 className="font-bold text-xl mb-4">
-      Customer Information
-    </h3>
+    <div>
+      <p className="text-gray-500 text-sm">
+        Parking Name
+      </p>
 
-    <p>
-      <b>Name:</b> {booking.customerName}
-    </p>
+      <p className="font-semibold">
+        {booking.parkingTitle || booking.parkingName || booking.title || "Not Available"}
+      </p>
+    </div>
 
-    <p className="mt-2">
-      <b>Email:</b> {booking.customerEmail}
-    </p>
+    <div>
+      <p className="text-gray-500 text-sm">
+        Parking ID
+      </p>
 
-    <p className="mt-2">
-      <b>Phone:</b>{" "}
-      {booking.customerPhone || "Not Available"}
-    </p>
+      <p className="font-semibold">
+        {booking.parkingId}
+      </p>
+    </div>
+
+    <div>
+      <p className="text-gray-500 text-sm">
+        Parking Type
+      </p>
+
+      <p className="font-semibold">
+        {booking.parkingType || "Not Available"}
+      </p>
+    </div>
+
+    <div>
+      <p className="text-gray-500 text-sm">
+        Slot Number
+      </p>
+
+      <p className="font-semibold">
+        {booking.slotNumber || "Not Assigned"}
+      </p>
+    </div>
 
   </div>
 
-  <div className="bg-white p-5 rounded-2xl">
+</div>
 
-    <h3 className="font-bold text-xl mb-4">
+                  {/* CUSTOMER & VEHICLE */}
+
+<div className="grid lg:grid-cols-[1.3fr_1fr] gap-6 mb-6">
+
+  {/* CUSTOMER */}
+
+  <div className="bg-white rounded-2xl p-5">
+
+    <h3 className="font-bold text-xl mb-5">
+      Customer Information
+    </h3>
+
+    <div className="flex gap-6">
+
+      {booking.customerPhoto ? (
+  <img
+    src={booking.customerPhoto}
+    alt="Customer"
+    className="w-36 h-36 rounded-3xl object-cover flex-shrink-0"
+  />
+) : (
+  <div className="w-36 h-36 rounded-3xl bg-green-600 text-white flex items-center justify-center text-4xl font-bold flex-shrink-0">
+    {(booking.customerName || "C")
+      .split(" ")
+      .map((word: string) => word[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase()}
+  </div>
+)}
+
+      <div className="flex flex-col justify-center space-y-4">
+
+        <p>
+  <b>Customer ID:</b> {booking.customerId || "N/A"}
+</p>
+
+        <p>
+          <b>Name:</b> {booking.customerName}
+        </p>
+
+        <p>
+          <b>Email:</b> {booking.customerEmail}
+        </p>
+
+        <p>
+          <b>Phone:</b>{" "}
+          {booking.customerPhone || "Not Available"}
+        </p>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  {/* VEHICLE */}
+
+  <div className="bg-white rounded-2xl p-5">
+
+    <h3 className="font-bold text-xl mb-5">
       Vehicle Information
     </h3>
 
-    <p>
-      <b>Brand:</b>{" "}
-      {booking.vehicleBrand}
+    <p><b>Brand:</b> {booking.vehicleBrand}</p>
+
+    <p className="mt-3">
+      <b>Model:</b> {booking.vehicleModel}
     </p>
 
-    <p className="mt-2">
-      <b>Model:</b>{" "}
-      {booking.vehicleModel}
+    <p className="mt-3">
+      <b>Number:</b> {booking.vehicleNumber}
     </p>
 
-    <p className="mt-2">
-      <b>Number:</b>{" "}
-      {booking.vehicleNumber}
+    <p className="mt-3">
+      <b>Type:</b> {booking.vehicleType}
     </p>
 
-    <p className="mt-2">
-      <b>Type:</b>{" "}
-      {booking.vehicleType}
-    </p>
-
-    <p className="mt-2">
-      <b>Color:</b>{" "}
-      {booking.vehicleColor}
+    <p className="mt-3">
+      <b>Color:</b> {booking.vehicleColor}
     </p>
 
   </div>
@@ -1416,7 +1567,8 @@ const visibleBookings =
 
 
 
-  // Approve booking
+// Update Booking
+
 await updateDoc(
   doc(db, "bookings", booking.id),
   {
@@ -1426,19 +1578,33 @@ await updateDoc(
   }
 );
 
-  // Update slot counts
-  await updateDoc(
-  doc(db, "bookings", booking.id),
-  {
-    bookingStatus: "Approved",
-    ownerApprovalStatus: "Approved",
-    approvedDate: new Date(),
-  }
+// Update Payment
+
+const paymentSnapshot = await getDocs(
+  query(
+    collection(db, "payments"),
+    where("bookingDocumentId", "==", booking.id)
+  )
 );
 
-alert("Booking Approved");
+if (!paymentSnapshot.empty) {
 
-  alert("Booking Approved");
+  const paymentDoc =
+    paymentSnapshot.docs[0];
+
+  await updateDoc(
+    paymentDoc.ref,
+    {
+      bookingStatus: "Approved",
+      ownerApprovalStatus: "Approved",
+      approvedDate: new Date(),
+      updatedAt: new Date(),
+    }
+  );
+
+}
+
+alert("Booking Approved");
 
 } catch (error) {
 
@@ -1465,14 +1631,90 @@ alert("Booking Approved");
       booking.parkingId
     );
 
-    await updateDoc(
-      doc(db, "bookings", booking.id),
-      {
-        bookingStatus: "Rejected",
-        ownerApprovalStatus: "Rejected",
-        paymentStatus: "Refund Pending",
-      }
-    );
+// Update Booking
+
+const rejectedAt = new Date();
+
+await updateDoc(
+  doc(db, "bookings", booking.id),
+  {
+    bookingStatus: "Rejected",
+    ownerApprovalStatus: "Rejected",
+
+    paymentStatus: "Refund Pending",
+    refundStatus: "Pending",
+
+    refundAmount: Number(
+      booking.refundAmount ||
+      booking.parkingAmount ||
+      0
+    ),
+
+    cancelledAt: rejectedAt,
+    refundRequestedAt: rejectedAt,
+
+    cancellationType: "Owner Rejected",
+    cancellationRemarks:
+      "Booking rejected by parking owner.",
+
+    ownerPayoutStatus: "Not Eligible",
+  }
+);
+
+// Update Payment
+
+const paymentSnapshot = await getDocs(
+  query(
+    collection(db, "payments"),
+    where(
+      "bookingDocumentId",
+      "==",
+      booking.id
+    )
+  )
+);
+
+if (!paymentSnapshot.empty) {
+  const paymentDoc =
+    paymentSnapshot.docs[0];
+
+  await updateDoc(
+    paymentDoc.ref,
+    {
+      bookingStatus: "Rejected",
+      ownerApprovalStatus: "Rejected",
+
+      paymentStatus: "Refund Pending",
+      refundStatus: "Pending",
+
+      refundAmount: Number(
+        booking.refundAmount ||
+        booking.parkingAmount ||
+        0
+      ),
+
+      cancelledAt: rejectedAt,
+      refundRequestedAt: rejectedAt,
+
+      cancellationType: "Owner Rejected",
+      cancellationRemarks:
+        "Booking rejected by parking owner.",
+
+      ownerPayoutStatus: "Not Eligible",
+
+      updatedAt: rejectedAt,
+    }
+  );
+} else {
+  console.error(
+    "Payment document not found for booking:",
+    booking.id
+  );
+
+  alert(
+    "Booking was rejected, but the linked payment record was not found."
+  );
+}
 
 await updateDoc(parkingRef,{
 availableSlots: increment(1),

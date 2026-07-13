@@ -21,25 +21,25 @@ import {
   storage,
 } from "@/lib/firebase";
 import Script from "next/script";
-import { useSearchParams } from "next/navigation";
 import {
   ref,
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
 
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { app } from "@/lib/firebase";
+
 export default function BookingPage() {
+
+  
 
   const params = useParams();
   const router = useRouter();
-  const searchParams =
-  useSearchParams();
-
-const plan =
-  searchParams.get("plan") ||
-  "Monthly";
 
 
+const [currentUser, setCurrentUser] = useState<any>(null);
+const [currentUserData, setCurrentUserData] = useState<any>(null);
 
 const [vehicleType, setVehicleType] =
   useState("Car");
@@ -65,11 +65,9 @@ const [uploading, setUploading] =
   const [parkingData, setParkingData] =
   useState<any>(null);
 
-  const parkingAmount =
+const parkingAmount =
   parkingData
-    ? plan === "Monthly"
-      ? Number(parkingData.monthlyPrice)
-      : Number(parkingData.yearlyPrice)
+    ? Number(parkingData.monthlyPrice)
     : 0;
 
 const platformFeePercent = 10;
@@ -106,6 +104,33 @@ const ownerReceivableAmount =
 
 }, [params.id]);
 
+useEffect(() => {
+  const auth = getAuth(app);
+
+  const unsubscribe = onAuthStateChanged(auth, async (loggedUser) => {
+    if (!loggedUser) {
+      alert("Please login to book parking.");
+      router.push("/login");
+      return;
+    }
+
+    setCurrentUser(loggedUser);
+
+    const userDoc = await getDoc(
+      doc(db, "users", loggedUser.uid)
+    );
+
+    if (userDoc.exists()) {
+      setCurrentUserData(userDoc.data());
+    } else {
+      alert("User profile not found.");
+      router.push("/profile");
+    }
+  });
+
+  return () => unsubscribe();
+}, [router]);
+
   return (
     <>
   <Script src="https://checkout.razorpay.com/v1/checkout.js" />
@@ -139,48 +164,26 @@ const ownerReceivableAmount =
   <div className="flex justify-between mb-2">
     <span>Parking Charges</span>
     <span>
-      ₹{
-        plan === "Monthly"
-          ? parkingData?.monthlyPrice || 0
-          : parkingData?.yearlyPrice || 0
-      }
+      ₹{parkingData?.monthlyPrice || 0}
     </span>
   </div>
 
   <div className="flex justify-between mb-2">
     <span>Platform Fee (10%)</span>
     <span>
-      ₹{
-        Math.round(
-          ((plan === "Monthly"
-            ? Number(parkingData?.monthlyPrice || 0)
-            : Number(parkingData?.yearlyPrice || 0)) * 10) / 100
-        )
-      }
-    </span>
+  ₹{platformFeeAmount}
+</span>
   </div>
 
 <hr className="my-4 border-green-300" />
 
 <div className="flex justify-between text-2xl font-bold text-green-700">
-    <span>Total Payable</span>
-    <span>
-      ₹{
-        (plan === "Monthly"
-          ? Number(parkingData?.monthlyPrice || 0)
-          : Number(parkingData?.yearlyPrice || 0)) +
-        Math.round(
-          ((plan === "Monthly"
-            ? Number(parkingData?.monthlyPrice || 0)
-            : Number(parkingData?.yearlyPrice || 0)) * 10) / 100
-        )
-      }
-    </span>
-  </div>
+  <span>Total Payable</span>
 
-
-
-  
+  <span>
+    ₹{customerPaidAmount}
+  </span>
+</div>  
 
 </div>
 
@@ -283,26 +286,35 @@ const ownerReceivableAmount =
         <button
   onClick={async () => {
 
-    const parkingDoc = await getDoc(
-  doc(
-    db,
-    "parkings",
-    params.id as string
-  )
+    const parkingRef = doc(
+  db,
+  "parkings",
+  params.id as string
 );
 
-const parkingData =
-  parkingDoc.data();
+const parkingDoc = await getDoc(parkingRef);
+
+if (!parkingDoc.exists()) {
+  alert("Parking not found.");
+  return;
+}
+
+const parkingData = parkingDoc.data();
+
+  if (!parkingData) {
+  alert("Parking not found");
+  return;
+}
 
   // CUSTOMER ALREADY HAS ACTIVE BOOKING?
 
 const existingBookingQuery = query(
   collection(db, "bookings"),
-  where(
-    "customerUid",
-    "==",
-    localStorage.getItem("userUid")
-  ),
+where(
+  "customerUid",
+  "==",
+  currentUser.uid
+),
   where(
     "parkingId",
     "==",
@@ -397,19 +409,9 @@ if (
 
 const validTill = new Date(bookingStart);
 
-if (plan === "Monthly") {
-
-  validTill.setMonth(
-    validTill.getMonth() + 1
-  );
-
-} else {
-
-  validTill.setFullYear(
-    validTill.getFullYear() + 1
-  );
-
-}
+validTill.setMonth(
+  validTill.getMonth() + 1
+);
 
 let vehicleImageUrl = "";
 
@@ -436,15 +438,7 @@ if (vehicleImage) {
 // RECHECK BEFORE CREATING BOOKING
 
 const latestParkingDoc =
-  await getDoc(
-
-    doc(
-      db,
-      "parkings",
-      parkingDoc.id
-    )
-
-  );
+  await getDoc(parkingRef);
 
 const latestParking = latestParkingDoc.data();
 
@@ -452,6 +446,32 @@ if (!latestParking) {
   alert("Parking data not found");
   return;
 }
+
+// Get Customer Details
+const customerDoc = await getDoc(
+doc(
+  db,
+  "users",
+  currentUser.uid
+)
+);
+
+const customerData = customerDoc.exists()
+  ? customerDoc.data()
+  : null;
+
+  // Get Owner Details
+const ownerDoc = await getDoc(
+doc(
+  db,
+  "users",
+  parkingData?.ownerUid || ""
+)
+);
+
+const ownerData = ownerDoc.exists()
+  ? ownerDoc.data()
+  : null;
 
 if (
   Number(
@@ -480,30 +500,22 @@ bookingId:
 
 
 
-  customerUid:
-    localStorage.getItem(
-      "userUid"
-    ),
+customerUid: currentUser.uid,
+customerId: currentUserData?.userId || "",
+customerName: currentUserData?.name || "",
+customerEmail: currentUser.email || currentUserData?.email || "",
+customerPhone: currentUserData?.phone || "",
+customerPhoto:
+  currentUserData?.photoURL ||
+  currentUserData?.photo ||
+  "",
 
-
-
-customerName:
-  localStorage.getItem(
-    "userName"
-  ),
-
-customerEmail:
-  localStorage.getItem(
-    "userEmail"
-  ),
-
-customerPhone:
-  localStorage.getItem(
-    "userPhone"
-  ),
-
- ownerUid:
+  
+ownerUid:
   parkingData?.ownerUid,
+
+ownerId:
+  parkingData?.ownerId,
 
 ownerName:
   parkingData?.ownerName,
@@ -515,7 +527,7 @@ ownerPhone:
   parkingData?.ownerPhone,
 
 ownerPhoto:
-  parkingData?.ownerPhoto,
+  ownerData?.photo || "",
 
 
 
@@ -538,10 +550,8 @@ parkingType:
 monthlyPrice:
   Number(parkingData?.monthlyPrice),
 
-yearlyPrice:
-  Number(parkingData?.yearlyPrice),
 
-  plan,
+ plan: "Monthly",
 
 parkingAmount,
 
@@ -554,7 +564,7 @@ customerPaidAmount,
 ownerReceivableAmount,
 
 ownerPayoutStatus:
-  "Pending",
+  "Not Eligible",
 
     validTill:
   validTill.toISOString(),
@@ -581,7 +591,7 @@ ownerApprovalStatus:
   "Pending",
 
 paymentStatus:
-  "Paid",
+  "Pending Verification",
 
  bookingDate: bookingStart,
 
@@ -591,32 +601,350 @@ bookingStartDate:
 
 };
 
-    try {
+try {
+  if (!currentUser || !currentUserData) {
+    alert("User data is still loading. Please try again.");
+    return;
+  }
 
+  const orderResponse = await fetch(
+    "/api/create-order",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        amount: customerPaidAmount,
+      }),
+    }
+  );
 
+  const orderResult = await orderResponse.json();
 
-      const options = {
-  key: "rzp_test_Su5POE7a3UsqZv",
+  if (!orderResponse.ok || !orderResult.success) {
+    alert(
+      orderResult.message ||
+      "Unable to create payment order."
+    );
+    return;
+  }
+
+const razorpayOrder =
+  orderResult.order;
+
+if (!razorpayOrder?.id) {
+  alert(
+    "Razorpay Order ID was not generated."
+  );
+  return;
+}
+
+const options = {
+key:
+  process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
 amount:
   customerPaidAmount * 100,
-  currency: "INR",
-  name: "CarParking Bangalore",
+currency: "INR",
+
+order_id: razorpayOrder.id,
+
+name: "CarParking Bangalore",
   description: "Parking Booking Payment",
 
-  handler: async function () {
+  prefill: {
+  name:
+    currentUserData?.name || "",
 
-    console.log("PAYMENT SUCCESS HANDLER CALLED");
+  email:
+    currentUserData?.email ||
+    currentUser?.email ||
+    "",
+
+  contact:
+    currentUserData?.phone || "",
+},
+
+handler: async function (
+  response: any
+) {
+  console.log(
+    "PAYMENT SUCCESS HANDLER CALLED"
+  );
+
+  console.log(
+    "Razorpay Response:",
+    response
+  );
 
   try {
-    
+    const verificationResponse =
+      await fetch(
+        "/api/verify-payment",
+        {
+          method: "POST",
 
-    await addDoc(
-      collection(db, "bookings"),
-      bookingData
-    );
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-    await updateDoc(
-  doc(db, "parkings", parkingDoc.id),
+          body: JSON.stringify({
+            razorpayOrderId:
+              response
+                .razorpay_order_id,
+
+            razorpayPaymentId:
+              response
+                .razorpay_payment_id,
+
+            razorpaySignature:
+              response
+                .razorpay_signature,
+
+            expectedAmount:
+              customerPaidAmount,
+          }),
+        }
+      );
+
+    const verificationResult =
+      await verificationResponse.json();
+
+    if (
+      !verificationResponse.ok ||
+      !verificationResult.success
+    ) {
+      alert(
+        verificationResult.message ||
+        "Payment verification failed. Booking was not created."
+      );
+
+      return;
+    }
+
+    const verifiedPayment =
+      verificationResult.payment;
+
+    const bookingReference = await addDoc(
+  collection(
+    db,
+    "bookings"
+  ),
+  {
+    ...bookingData,
+
+    razorpayPaymentId:
+      response.razorpay_payment_id,
+
+    razorpayOrderId:
+      response.razorpay_order_id,
+
+    razorpaySignature:
+      response.razorpay_signature,
+
+    paymentStatus:
+      "Captured",
+
+    paymentVerificationStatus:
+      "Verified",
+
+    paymentMethod:
+      verifiedPayment.method ||
+      "Razorpay",
+
+    paymentCurrency:
+      verifiedPayment.currency ||
+      "INR",
+
+    verifiedPaymentAmount:
+      Number(
+        verifiedPayment.amount || 0
+      ),
+
+    paymentCaptured:
+      verifiedPayment.captured === true,
+
+    paymentCapturedAt:
+      new Date(),
+
+    paymentVerifiedAt:
+      new Date(),
+
+    paymentCreatedAt:
+      new Date(),
+
+    settlementStatus:
+      "Pending",
+
+    settlementId:
+      "",
+
+    settlementUtr:
+      "",
+
+    ownerPayoutStatus:
+      "Not Eligible",
+  }
+);
+
+/* CREATE PAYMENT TRANSACTION */
+
+await addDoc(
+  collection(
+    db,
+    "payments"
+  ),
+  {
+    bookingDocumentId:
+      bookingReference.id,
+
+    bookingId:
+      bookingData.bookingId,
+
+    customerUid:
+      currentUser.uid,
+
+    customerId:
+      currentUserData?.userId || "",
+
+    customerName:
+      currentUserData?.name || "",
+
+    customerEmail:
+      currentUserData?.email ||
+      currentUser.email ||
+      "",
+
+    customerPhone:
+      currentUserData?.phone || "",
+
+    ownerUid:
+      parkingData?.ownerUid || "",
+
+    ownerId:
+      parkingData?.ownerId || "",
+
+    ownerName:
+      parkingData?.ownerName || "",
+
+    ownerEmail:
+      parkingData?.ownerEmail || "",
+
+    ownerPhone:
+      parkingData?.ownerPhone || "",
+
+    parkingId:
+      parkingDoc.id,
+
+    parkingTitle:
+      parkingData?.title || "",
+
+    razorpayPaymentId:
+      response.razorpay_payment_id,
+
+    razorpayOrderId:
+      response.razorpay_order_id,
+
+    razorpaySignature:
+      response.razorpay_signature,
+
+    customerPaidAmount:
+      Number(customerPaidAmount),
+
+    parkingAmount:
+      Number(parkingAmount),
+
+    platformFeePercent:
+      Number(platformFeePercent),
+
+    platformFeeAmount:
+      Number(platformFeeAmount),
+
+    ownerReceivableAmount:
+      Number(ownerReceivableAmount),
+
+    paymentMethod:
+      verifiedPayment.method ||
+      "Razorpay",
+
+    paymentCurrency:
+      verifiedPayment.currency ||
+      "INR",
+
+    paymentStatus:
+      "Captured",
+
+    paymentVerificationStatus:
+      "Verified",
+
+    paymentCaptured:
+      verifiedPayment.captured === true,
+
+    paymentCapturedAt:
+      new Date(),
+
+    paymentVerifiedAt:
+      new Date(),
+
+    settlementStatus:
+      "Pending",
+
+    settlementId:
+      "",
+
+    settlementAmount:
+      0,
+
+    settlementFee:
+      0,
+
+    settlementTax:
+      0,
+
+    settlementUtr:
+      "",
+
+    settledAt:
+      null,
+
+    refundStatus:
+      "Not Applicable",
+
+    refundAmount:
+      0,
+
+    razorpayRefundId:
+      "",
+
+    refundRequestedAt:
+      null,
+
+    refundProcessedAt:
+      null,
+
+    ownerPayoutStatus:
+      "Not Eligible",
+
+    ownerPayoutReference:
+      "",
+
+    ownerPaidAt:
+      null,
+
+    transactionType:
+      "Parking Booking",
+
+    createdAt:
+      new Date(),
+
+    updatedAt:
+      new Date(),
+  }
+);
+
+await updateDoc(
+  parkingRef,
   {
     availableSlots: increment(-1),
     occupiedSlots: increment(1),
@@ -627,17 +955,23 @@ amount:
   }
 );
 
-    alert("Payment Successful");
+alert(
+  "Payment verified successfully. Your booking has been created."
+);
 
     router.push("/bookings");
 
-  } catch (error) {
+} catch (error: any) {
+  console.error(
+    "Payment verification or booking error:",
+    error
+  );
 
-    console.log(error);
-
-    alert("Booking could not be saved.");
-
-  }
+  alert(
+    error?.message ||
+    "Payment could not be verified or the booking could not be created."
+  );
+}
 
 },
 

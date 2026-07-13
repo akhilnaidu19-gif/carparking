@@ -194,13 +194,7 @@ onSnapshot(
   const loadWishlist =
     async () => {
 
-      const userEmail =
-        localStorage.getItem(
-          "userEmail"
-        );
-
-      if (!userEmail)
-        return;
+if (!user) return;
 
       const q = query(
 
@@ -209,11 +203,11 @@ onSnapshot(
           "wishlist"
         ),
 
-        where(
-          "userEmail",
-          "==",
-          userEmail
-        )
+where(
+  "userUid",
+  "==",
+  user.uid
+)
 
       );
 
@@ -236,7 +230,7 @@ onSnapshot(
 
   loadWishlist();
 
-}, []);
+}, [user]);
 
 const handleSearch = () => {
 
@@ -856,12 +850,7 @@ backgroundImage:
 
     try {
 
-      const userEmail =
-        localStorage.getItem(
-          "userEmail"
-        );
-
-      if (!userEmail) {
+if (!user) {
 
         alert(
           "Please Login First"
@@ -878,11 +867,11 @@ backgroundImage:
           "wishlist"
         ),
 
-        where(
-          "userEmail",
-          "==",
-          userEmail
-        ),
+where(
+  "userUid",
+  "==",
+  user.uid
+),
 
         where(
           "parkingId",
@@ -940,7 +929,8 @@ backgroundImage:
 
         {
 
-          userEmail,
+         userUid: user.uid,
+userPhone: user.phoneNumber || "",
 
           parkingId:
             spot.id,

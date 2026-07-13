@@ -14,7 +14,9 @@ import {
   collection,
   onSnapshot,
   query,
-  where,
+where,
+getDocs,
+deleteDoc,
 } from "firebase/firestore";
 
 import { app, db } from "@/lib/firebase";
@@ -37,6 +39,9 @@ export default function ParkingDetailsPage() {
     const [user, setUser] =
   useState<any>(null);
 
+  const [userProfile, setUserProfile] =
+  useState<any>(null);
+
   const [reviews, setReviews] =
     useState<any[]>([]);
 
@@ -51,6 +56,8 @@ export default function ParkingDetailsPage() {
 
   const [submittingReview, setSubmittingReview] =
     useState(false);
+
+    
 
   // FETCH PARKING
 
@@ -96,9 +103,21 @@ export default function ParkingDetailsPage() {
 
       auth,
 
-      (currentUser) => {
+      async (currentUser) => {
 
         setUser(currentUser);
+
+        if (!currentUser) return;
+
+        const userDoc = await getDoc(
+          doc(db, "users", currentUser.uid)
+        );
+
+        if (userDoc.exists()) {
+
+          setUserProfile(userDoc.data());
+
+        }
 
       }
 
@@ -107,6 +126,28 @@ export default function ParkingDetailsPage() {
   return () => unsubscribe();
 
 }, []);
+
+useEffect(() => {
+
+  const loadWishlistStatus = async () => {
+
+    if (!user || !parking) return;
+
+    const q = query(
+      collection(db, "wishlist"),
+      where("userUid", "==", user.uid),
+      where("parkingId", "==", parking.id)
+    );
+
+    const snapshot = await getDocs(q);
+
+    setWishlist(!snapshot.empty);
+
+  };
+
+  loadWishlistStatus();
+
+}, [user, parking]);
 
   // FETCH REVIEWS
 
@@ -201,7 +242,7 @@ export default function ParkingDetailsPage() {
 
       : "0";
 
- const isOwner =
+const isOwner =
   user &&
   parking &&
   parking.ownerUid === user.uid;
@@ -216,36 +257,82 @@ export default function ParkingDetailsPage() {
 
         {/* HERO IMAGE */}
 
-        <div
-          className="h-[450px] bg-cover bg-center relative"
-          style={{
-            backgroundImage: `url(${parking.image})`,
-          }}
-        >
+<div className="relative h-[450px]">
 
-          <div className="absolute inset-0 bg-black/40"></div>
+  {parking.image ? (
 
-          {/* WISHLIST */}
+    <img
+      src={parking.image}
+      alt={parking.title}
+      className="w-full h-full object-cover"
+    />
 
-          <button
+  ) : (
 
-            onClick={() =>
-              setWishlist(
-                !wishlist
-              )
-            }
+    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
 
-            className="absolute top-8 right-8 bg-white w-16 h-16 rounded-full text-3xl shadow-2xl z-10"
+      <div className="text-center">
 
-          >
-
-            {wishlist
-              ? "❤️"
-              : "🤍"}
-
-          </button>
-
+        <div className="text-7xl mb-4">
+          🖼️
         </div>
+
+        <h2 className="text-3xl font-bold text-gray-600">
+          No Image Available
+        </h2>
+
+      </div>
+
+    </div>
+
+  )}
+
+  <div className="absolute inset-0 bg-black/40"></div>
+
+  {/* WISHLIST */}
+
+<button
+  onClick={async () => {
+    if (!user) {
+      alert("Please Login First");
+      return;
+    }
+
+    const q = query(
+      collection(db, "wishlist"),
+      where("userUid", "==", user.uid),
+      where("parkingId", "==", parking.id)
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      await deleteDoc(doc(db, "wishlist", snapshot.docs[0].id));
+      setWishlist(false);
+      alert("Removed From Wishlist");
+      return;
+    }
+
+    await addDoc(collection(db, "wishlist"), {
+      userUid: user.uid,
+      userPhone: user.phoneNumber || "",
+      parkingId: parking.id,
+      title: parking.title,
+      image: parking.image,
+      location: parking.location,
+      monthlyPrice: parking.monthlyPrice,
+      createdAt: new Date(),
+    });
+
+    setWishlist(true);
+    alert("Added To Wishlist ❤️");
+  }}
+    className="absolute top-8 right-8 bg-white w-16 h-16 rounded-full text-3xl shadow-2xl z-10"
+  >
+    {wishlist ? "❤️" : "🤍"}
+  </button>
+
+</div>
 
         <div className="max-w-6xl mx-auto px-6 py-12">
 
@@ -344,6 +431,10 @@ export default function ParkingDetailsPage() {
                 {parking.ownerName}
 
               </h2>
+
+              <p className="text-gray-500 text-sm">
+  Owner ID: {parking.ownerId || "N/A"}
+</p>
 
               <p className="text-gray-600">
 
@@ -473,14 +564,14 @@ export default function ParkingDetailsPage() {
       manage bookings, and update parking details.
     </p>
 
-    <button
-      onClick={() =>
-        window.location.href = "/owner-dashboard"
-      }
-      className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-2xl font-bold"
-    >
-      Edit Listing
-    </button>
+<button
+  onClick={() =>
+    window.location.href = `/edit-parking/${parking.id}`
+  }
+  className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-2xl font-bold"
+>
+  ✏️ Edit Listing
+</button>
 
   </div>
 
@@ -517,34 +608,7 @@ export default function ParkingDetailsPage() {
 
   </div>
 
-  {/* Yearly */}
-
-  <div className="bg-white p-8 rounded-3xl shadow-lg">
-
-    <h2 className="text-2xl font-bold mb-4">
-      Yearly Plan
-    </h2>
-
-    <p className="text-4xl font-bold text-black mb-4">
-      ₹30000/year
-    </p>
-
-    <button
-      onClick={() =>
-        window.location.href =
-          `/booking/${parking.id}?plan=Yearly`
-      }
-      disabled={
-        Number(parking.availableSlots) <= 0
-      }
-      className="w-full bg-black text-white px-6 py-4 rounded-2xl font-bold disabled:bg-gray-400"
-    >
-      {Number(parking.availableSlots) <= 0
-        ? "Fully Occupied"
-        : "Book Yearly"}
-    </button>
-
-  </div>
+  
 
 </div>
 
@@ -640,19 +704,40 @@ export default function ParkingDetailsPage() {
                 value={
                   reviewText
                 }
-                onChange={(e) =>
-                  setReviewText(
-                    e.target.value
-                  )
-                }
+onChange={(e) => {
+
+  if (
+    e.target.value.length <= 500
+  ) {
+    setReviewText(
+      e.target.value
+    );
+  }
+
+}}
                 className="border p-4 rounded-2xl w-full h-32 mb-5"
               ></textarea>
 
               <button
 
-                onClick={async () => {
+onClick={async () => {
 
-                  try {
+  if (!user) {
+    alert("Please login to submit a review.");
+    return;
+  }
+
+  if (!reviewText.trim()) {
+    alert("Please enter your review.");
+    return;
+  }
+
+if (isOwner) {
+  alert("You cannot review your own parking.");
+  return;
+}
+
+  try {
 
                     setSubmittingReview(
                       true
@@ -665,60 +750,44 @@ export default function ParkingDetailsPage() {
                         "reviews"
                       ),
 
-                      {
+                     {
+  parkingId: parking.id,
 
-                        parkingId:
-                          parking.id,
+  userUid: user.uid,
 
-                        userName:
-                          localStorage.getItem(
-                            "userName"
-                          ) || "User",
+userPhone:
+  userProfile?.phone || "",
 
-                        userEmail:
-                          localStorage.getItem(
-                            "userEmail"
-                          ) || "",
+userName:
+  userProfile?.name || "User",
 
-                        review:
-                          reviewText,
+userEmail:
+  userProfile?.email || "",
 
-                        rating,
+  review: reviewText.trim(),
 
-                        createdAt:
-                          new Date(),
+  rating,
 
-                      }
+  createdAt: new Date(),
+}
 
                     );
 
                     await addDoc(
-
-  collection(
-    db,
-    "notifications"
-  ),
-
+  collection(db, "notifications"),
   {
+    ownerUid: parking.ownerUid || "",
 
-    ownerEmail:
-      parking.ownerEmail || "",
+    title: "New Review",
 
-    title:
-      "New Review",
+message: `${
+  userProfile?.name || "A customer"
+} reviewed ${parking.title}`,
 
-    message:
-      `${localStorage.getItem(
-        "userName"
-      )} reviewed ${parking.title}`,
-
-    createdAt:
-      new Date(),
+    createdAt: new Date(),
 
     read: false,
-
   }
-
 );
 
                     

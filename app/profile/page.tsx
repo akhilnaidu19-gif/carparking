@@ -15,6 +15,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 
 import {
@@ -53,6 +54,9 @@ export default function ProfilePage() {
 
   const auth = getAuth(app);
 
+  const [userId, setUserId] =
+  useState("");
+
   // AUTH + FETCH PROFILE
 
   useEffect(() => {
@@ -83,6 +87,10 @@ export default function ProfilePage() {
 
               const data =
                 docSnap.data();
+
+                setUserId(
+  data.userId || ""
+);
 
               setName(
                 data.name || ""
@@ -208,8 +216,8 @@ export default function ProfilePage() {
     verified:
       false,
 
-    updatedAt:
-      new Date(),
+updatedAt: serverTimestamp(),
+updatedBy: user.uid,
 
   },
 
@@ -222,6 +230,26 @@ export default function ProfilePage() {
         localStorage.setItem(
   "userPhone",
   phone
+);
+
+localStorage.setItem(
+  "userName",
+  name
+);
+
+localStorage.setItem(
+  "userCity",
+  city
+);
+
+localStorage.setItem(
+  "userPhoto",
+  uploadedPhoto
+);
+
+localStorage.setItem(
+  "userId",
+  userId
 );
 
         // FIREBASE AUTH PROFILE
@@ -295,13 +323,21 @@ export default function ProfilePage() {
 
             <div className="flex items-center gap-6">
 
-              <img
-                src={
-                  photoURL ||
-                  "https://via.placeholder.com/150"
-                }
-                className="w-36 h-36 rounded-full object-cover border-4 border-green-500"
-              />
+{photoURL ? (
+  <img
+    src={photoURL}
+    className="w-36 h-36 rounded-full object-cover border-4 border-green-500"
+  />
+) : (
+  <div className="w-36 h-36 rounded-full bg-green-600 border-4 border-green-500 flex items-center justify-center text-white text-5xl font-bold">
+    {(name || "User")
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase()}
+  </div>
+)}
 
               <div>
 
@@ -317,6 +353,10 @@ export default function ProfilePage() {
                   {user.email}
 
                 </p>
+
+                <p className="text-green-400 font-bold mt-2">
+  User ID: {userId || "N/A"}
+</p>
 
                 <div className="flex flex-wrap gap-3 mt-4">
 
