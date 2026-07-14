@@ -12,8 +12,9 @@ import {
   getDocs,
   getDoc,
   orderBy,
-  updateDoc,
-  increment,
+updateDoc,
+increment,
+runTransaction,
 } from "firebase/firestore";
 
 import {
@@ -1621,122 +1622,268 @@ alert("Booking Approved");
     </button>
 
     <button
-      onClick={async () => {
+  onClick={async () => {
+    try {
+      const bookingRef = doc(
+        db,
+        "bookings",
+        booking.id
+      );
 
-  try {
+      const parkingRef = doc(
+        db,
+        "parkings",
+        booking.parkingId
+      );
 
-    const parkingRef = doc(
-      db,
-      "parkings",
-      booking.parkingId
-    );
+      const latestBookingSnap =
+        await getDoc(bookingRef);
 
-// Update Booking
+      if (!latestBookingSnap.exists()) {
+        alert("Booking not found.");
+        return;
+      }
 
-const rejectedAt = new Date();
+      const latestBookingData =
+        latestBookingSnap.data();
 
-await updateDoc(
-  doc(db, "bookings", booking.id),
-  {
-    bookingStatus: "Rejected",
-    ownerApprovalStatus: "Rejected",
+      if (
+        latestBookingData.bookingStatus ===
+        "Rejected"
+      ) {
+        alert(
+          "This booking has already been rejected."
+        );
+        return;
+      }
 
-    paymentStatus: "Refund Pending",
-    refundStatus: "Pending",
+      if (
+        latestBookingData.bookingStatus !==
+        "Pending Approval"
+      ) {
+        alert(
+          "Only pending bookings can be rejected."
+        );
+        return;
+      }
 
-    refundAmount: Number(
-      booking.refundAmount ||
-      booking.parkingAmount ||
-      0
-    ),
+      const rejectedAt = new Date();
 
-    cancelledAt: rejectedAt,
-    refundRequestedAt: rejectedAt,
+      await runTransaction(
+        db,
+        async (transaction) => {
+          const bookingSnapshot =
+            await transaction.get(
+              bookingRef
+            );
 
-    cancellationType: "Owner Rejected",
-    cancellationRemarks:
-      "Booking rejected by parking owner.",
+          const parkingSnapshot =
+            await transaction.get(
+              parkingRef
+            );
 
-    ownerPayoutStatus: "Not Eligible",
-  }
-);
+          if (!bookingSnapshot.exists()) {
+            throw new Error(
+              "Booking document not found."
+            );
+          }
 
-// Update Payment
+          if (!parkingSnapshot.exists()) {
+            throw new Error(
+              "Parking document not found."
+            );
+          }
 
-const paymentSnapshot = await getDocs(
-  query(
-    collection(db, "payments"),
-    where(
-      "bookingDocumentId",
-      "==",
-      booking.id
-    )
-  )
-);
+          const bookingData =
+            bookingSnapshot.data();
 
-if (!paymentSnapshot.empty) {
-  const paymentDoc =
-    paymentSnapshot.docs[0];
+          const parkingData =
+            parkingSnapshot.data();
 
-  await updateDoc(
-    paymentDoc.ref,
-    {
-      bookingStatus: "Rejected",
-      ownerApprovalStatus: "Rejected",
+          if (
+            bookingData.slotReleased === true
+          ) {
+            throw new Error(
+              "Parking slot has already been released."
+            );
+          }
 
-      paymentStatus: "Refund Pending",
-      refundStatus: "Pending",
+          const totalSlots = Math.max(
+            1,
+            Number(
+              parkingData.totalSlots || 1
+            )
+          );
 
-      refundAmount: Number(
-        booking.refundAmount ||
-        booking.parkingAmount ||
-        0
-      ),
+          const currentOccupied = Math.max(
+            0,
+            Number(
+              parkingData.occupiedSlots || 0
+            )
+          );
 
-      cancelledAt: rejectedAt,
-      refundRequestedAt: rejectedAt,
+          const newOccupied = Math.max(
+            0,
+            currentOccupied - 1
+          );
 
-      cancellationType: "Owner Rejected",
-      cancellationRemarks:
-        "Booking rejected by parking owner.",
+          const newAvailable = Math.min(
+            totalSlots,
+            totalSlots - newOccupied
+          );
 
-      ownerPayoutStatus: "Not Eligible",
+          transaction.update(
+            bookingRef,
+            {
+              bookingStatus:
+                "Rejected",
 
-      updatedAt: rejectedAt,
+              ownerApprovalStatus:
+                "Rejected",
+
+              paymentStatus:
+                "Refund Pending",
+
+              refundStatus:
+                "Pending",
+
+              refundAmount:
+                Number(
+                  bookingData.refundAmount ||
+                    bookingData.parkingAmount ||
+                    0
+                ),
+
+              cancelledAt:
+                rejectedAt,
+
+              refundRequestedAt:
+                rejectedAt,
+
+              cancellationType:
+                "Owner Rejected",
+
+              cancellationRemarks:
+                "Booking rejected by parking owner.",
+
+              ownerPayoutStatus:
+                "Not Eligible",
+
+              slotReleased:
+                true,
+
+              slotReleasedAt:
+                rejectedAt,
+
+              updatedAt:
+                rejectedAt,
+            }
+          );
+
+          transaction.update(
+            parkingRef,
+            {
+              occupiedSlots:
+                newOccupied,
+
+              availableSlots:
+                newAvailable,
+
+              availability:
+                newAvailable > 0
+                  ? "Available"
+                  : "Occupied",
+
+              updatedAt:
+                rejectedAt,
+            }
+          );
+        }
+      );
+
+      const paymentSnapshot =
+        await getDocs(
+          query(
+            collection(
+              db,
+              "payments"
+            ),
+            where(
+              "bookingDocumentId",
+              "==",
+              booking.id
+            )
+          )
+        );
+
+      if (!paymentSnapshot.empty) {
+        const paymentDoc =
+          paymentSnapshot.docs[0];
+
+        await updateDoc(
+          paymentDoc.ref,
+          {
+            bookingStatus:
+              "Rejected",
+
+            ownerApprovalStatus:
+              "Rejected",
+
+            paymentStatus:
+              "Refund Pending",
+
+            refundStatus:
+              "Pending",
+
+            refundAmount:
+              Number(
+                latestBookingData
+                  .refundAmount ||
+                  latestBookingData
+                    .parkingAmount ||
+                  0
+              ),
+
+            cancelledAt:
+              rejectedAt,
+
+            refundRequestedAt:
+              rejectedAt,
+
+            cancellationType:
+              "Owner Rejected",
+
+            cancellationRemarks:
+              "Booking rejected by parking owner.",
+
+            ownerPayoutStatus:
+              "Not Eligible",
+
+            updatedAt:
+              rejectedAt,
+          }
+        );
+      }
+
+      alert(
+        "Booking rejected. Parking slot released and refund request created."
+      );
+    } catch (error: any) {
+      console.error(
+        "Reject booking error:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Unable to reject booking."
+      );
     }
-  );
-} else {
-  console.error(
-    "Payment document not found for booking:",
-    booking.id
-  );
-
-  alert(
-    "Booking was rejected, but the linked payment record was not found."
-  );
-}
-
-await updateDoc(parkingRef,{
-availableSlots: increment(1),
-occupiedSlots: increment(-1),
-availability: "Available"
-});
-
-    alert("Booking Rejected");
-
-  } catch (error) {
-
-    console.log(error);
-
-    alert("Unable to reject booking");
-
-  }
-
-}}
-      className="bg-red-600 text-white px-6 py-3 rounded-2xl font-bold"
-    >
-      ❌ Reject Booking
-    </button>
+  }}
+  className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-bold"
+>
+  ❌ Reject Booking
+</button>
 
   </>
 
