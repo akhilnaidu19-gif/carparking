@@ -245,6 +245,11 @@ export async function POST(
         ? result.items
         : [];
 
+        console.log(
+  "Recon Items:",
+  JSON.stringify(items, null, 2)
+);
+
     let processed = 0;
     let matched = 0;
     let updated = 0;
