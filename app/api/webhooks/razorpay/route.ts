@@ -160,6 +160,10 @@ export async function POST(
 
     const event = JSON.parse(rawBody);
 
+    console.log(
+  JSON.stringify(event, null, 2)
+);
+
     const eventType =
       String(event.event || "");
 
