@@ -13,7 +13,6 @@ import {
   getDoc,
   orderBy,
 updateDoc,
-increment,
 runTransaction,
 } from "firebase/firestore";
 
@@ -55,6 +54,11 @@ const [
 
   const [loading, setLoading] =
     useState(true);
+
+    const [
+  processingBookingId,
+  setProcessingBookingId,
+] = useState<string | null>(null);
 
   const auth = getAuth(app);
   const router = useRouter();
@@ -1621,8 +1625,21 @@ alert("Booking Approved");
       ✅ Approve Booking
     </button>
 
-    <button
+<button
+  disabled={
+    processingBookingId === booking.id
+  }
   onClick={async () => {
+    if (
+      processingBookingId === booking.id
+    ) {
+      return;
+    }
+
+    setProcessingBookingId(
+      booking.id
+    );
+
     try {
       const bookingRef = doc(
         db,
@@ -1697,40 +1714,27 @@ alert("Booking Approved");
           const bookingData =
             bookingSnapshot.data();
 
-          const parkingData =
-            parkingSnapshot.data();
 
-          if (
-            bookingData.slotReleased === true
-          ) {
-            throw new Error(
-              "Parking slot has already been released."
-            );
-          }
+if (
+  bookingData.bookingStatus ===
+    "Rejected" ||
+  bookingData.slotReleased === true
+) {
+  throw new Error(
+    "This booking has already been rejected and the parking slot has already been released."
+  );
+}
 
-          const totalSlots = Math.max(
-            1,
-            Number(
-              parkingData.totalSlots || 1
-            )
-          );
+if (
+  bookingData.bookingStatus !==
+  "Pending Approval"
+) {
+  throw new Error(
+    "Only pending bookings can be rejected."
+  );
+}
 
-          const currentOccupied = Math.max(
-            0,
-            Number(
-              parkingData.occupiedSlots || 0
-            )
-          );
-
-          const newOccupied = Math.max(
-            0,
-            currentOccupied - 1
-          );
-
-          const newAvailable = Math.min(
-            totalSlots,
-            totalSlots - newOccupied
-          );
+          
 
           transaction.update(
             bookingRef,
@@ -1781,23 +1785,15 @@ alert("Booking Approved");
           );
 
           transaction.update(
-            parkingRef,
-            {
-              occupiedSlots:
-                newOccupied,
-
-              availableSlots:
-                newAvailable,
-
-              availability:
-                newAvailable > 0
-                  ? "Available"
-                  : "Occupied",
-
-              updatedAt:
-                rejectedAt,
-            }
-          );
+  parkingRef,
+  {
+    totalSlots: 1,
+    occupiedSlots: 0,
+    availableSlots: 1,
+    availability: "Available",
+    updatedAt: rejectedAt,
+  }
+);
         }
       );
 
@@ -1868,21 +1864,46 @@ alert("Booking Approved");
       alert(
         "Booking rejected. Parking slot released and refund request created."
       );
-    } catch (error: any) {
-      console.error(
-        "Reject booking error:",
-        error
-      );
 
-      alert(
-        error?.message ||
-          "Unable to reject booking."
-      );
-    }
+      setBookings((currentBookings) =>
+  currentBookings.map((item) =>
+    item.id === booking.id
+      ? {
+          ...item,
+          bookingStatus: "Rejected",
+          ownerApprovalStatus:
+            "Rejected",
+          paymentStatus:
+            "Refund Pending",
+          refundStatus: "Pending",
+          slotReleased: true,
+        }
+      : item
+  )
+);
+    } catch (error: any) {
+  console.error(
+    "Reject booking error:",
+    error
+  );
+
+  alert(
+    error?.message ||
+      "Unable to reject booking."
+  );
+} finally {
+  setProcessingBookingId(null);
+}
   }}
-  className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-bold"
+className={`text-white px-6 py-3 rounded-2xl font-bold ${
+  processingBookingId === booking.id
+    ? "bg-gray-400 cursor-not-allowed"
+    : "bg-red-600 hover:bg-red-700"
+}`}
 >
-  ❌ Reject Booking
+  {processingBookingId === booking.id
+    ? "Rejecting..."
+    : "❌ Reject Booking"}
 </button>
 
   </>
