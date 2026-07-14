@@ -245,10 +245,7 @@ export async function POST(
         ? result.items
         : [];
 
-        console.log(
-  "Recon Items:",
-  JSON.stringify(items, null, 2)
-);
+
 
     let processed = 0;
     let matched = 0;
@@ -272,26 +269,72 @@ export async function POST(
         continue;
       }
 
-      const paymentSnapshot =
-        await adminDb
-          .collection("payments")
-          .where(
-            "razorpayPaymentId",
-            "==",
-            item.entity_id
-          )
-          .limit(1)
-          .get();
+      let paymentDoc = null;
 
-      if (paymentSnapshot.empty) {
-        skipped++;
-        continue;
-      }
+/*
+  First try matching with Razorpay Payment ID.
+*/
+const paymentIdSnapshot =
+  await adminDb
+    .collection("payments")
+    .where(
+      "razorpayPaymentId",
+      "==",
+      item.entity_id
+    )
+    .limit(1)
+    .get();
 
-      matched++;
+if (!paymentIdSnapshot.empty) {
+  paymentDoc =
+    paymentIdSnapshot.docs[0];
+}
 
-      const paymentDoc =
-        paymentSnapshot.docs[0];
+/*
+  If Payment ID is not found, try Razorpay Order ID.
+*/
+if (
+  !paymentDoc &&
+  item.order_id
+) {
+  const orderIdSnapshot =
+    await adminDb
+      .collection("payments")
+      .where(
+        "razorpayOrderId",
+        "==",
+        item.order_id
+      )
+      .limit(1)
+      .get();
+
+  if (!orderIdSnapshot.empty) {
+    paymentDoc =
+      orderIdSnapshot.docs[0];
+  }
+}
+
+/*
+  Log the unmatched Razorpay transaction.
+*/
+if (!paymentDoc) {
+  console.log(
+    "Settlement payment not matched:",
+    {
+      razorpayPaymentId:
+        item.entity_id,
+      razorpayOrderId:
+        item.order_id || "",
+      settlementId:
+        item.settlement_id || "",
+    }
+  );
+
+  skipped++;
+  continue;
+}
+
+matched++;
 
       const paymentData =
         paymentDoc.data();
@@ -308,17 +351,20 @@ export async function POST(
         settlementStatus:
           "Settled",
 
+          settlementPaymentId:
+  item.entity_id || "",
+
         settlementId:
           item.settlement_id || "",
 
         settlementUtr:
           item.settlement_utr || "",
 
-        settlementAmount:
-          toRupees(
-            item.credit ||
-            item.amount
-          ),
+settlementGrossAmount:
+  toRupees(item.amount),
+
+settlementAmount:
+  toRupees(item.credit),
 
         settlementFee:
           toRupees(item.fee),
