@@ -776,13 +776,14 @@ userEmail:
                     await addDoc(
   collection(db, "notifications"),
   {
-    ownerUid: parking.ownerUid || "",
+    recipientUid: parking.ownerUid || "",
+    recipientRole: "owner",
 
     title: "New Review",
 
-message: `${
-  userProfile?.name || "A customer"
-} reviewed ${parking.title}`,
+    message: `${
+      userProfile?.name || "A customer"
+    } reviewed ${parking.title}`,
 
     createdAt: new Date(),
 

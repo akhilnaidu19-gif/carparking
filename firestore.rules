@@ -1,0 +1,453 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Common helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function userDocExists() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return userDocExists() && currentUser().role == 'admin';
+    }
+
+    function isApprovedOwner() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/ownerApplications/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/ownerApplications/$(request.auth.uid)).data.status == 'Approved';
+    }
+
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function validImageUrl(value) {
+      return value is string && value.size() <= 2048;
+    }
+
+    // ---------- Users ----------
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+
+      // Supports first-time profile creation, while preventing self-promotion.
+      allow create: if isSelf(uid)
+        && (!request.resource.data.keys().hasAny(['role'])
+            || request.resource.data.role == 'customer')
+        && (!request.resource.data.keys().hasAny(['verified'])
+            || request.resource.data.verified == false)
+        && (!request.resource.data.keys().hasAny(['uid'])
+            || request.resource.data.uid == uid);
+
+      // A user may edit profile fields only. Admin-controlled fields such as
+      // role, userId, verified and account status cannot be changed by the user.
+      allow update: if isAdmin() ||
+        (isSelf(uid)
+          && changedOnly([
+            'name', 'phone', 'city', 'photo', 'photoURL', 'email',
+            'bio', 'updatedAt', 'updatedBy'
+          ])
+          && request.resource.data.updatedBy == request.auth.uid
+          && (!request.resource.data.keys().hasAny(['photoURL'])
+              || validImageUrl(request.resource.data.photoURL)));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Owner applications ----------
+    match /ownerApplications/{applicationId} {
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.userUid == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.status == 'Pending';
+
+      // Applicant can correct application details only while pending and cannot
+      // change status or approval metadata. Admin controls approval/rejection.
+      allow update: if isAdmin() ||
+        (signedIn()
+          && resource.data.userUid == request.auth.uid
+          && resource.data.status == 'Pending'
+          && request.resource.data.userUid == resource.data.userUid
+          && request.resource.data.status == resource.data.status
+          && changedOnly([
+            'userName', 'userEmail', 'userPhone', 'bankName', 'accountName',
+            'accountNumber', 'ifsc', 'businessName', 'upiId', 'updatedAt'
+          ]));
+
+      allow delete: if isAdmin() ||
+        (signedIn()
+          && resource.data.userUid == request.auth.uid
+          && resource.data.status == 'Pending');
+    }
+
+    // ---------- Parking listings ----------
+    match /parkings/{parkingId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || resource.data.status == 'Approved';
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == 'Pending'
+        && request.resource.data.availability == 'Pending Approval'
+        && request.resource.data.totalSlots == 1
+        && request.resource.data.occupiedSlots == 0
+        && request.resource.data.availableSlots == 1;
+
+      // Admin may perform moderation. Owners can edit their own listing, but
+      // cannot grant approval, verification, featuring, or change ownership.
+      allow update: if isAdmin() ||
+        (signedIn()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.status == resource.data.status
+          && changedOnly([
+            'title', 'location', 'monthlyPrice', 'yearlyPrice', 'description',
+            'parkingType', 'cctv', 'images', 'image', 'latitude', 'longitude',
+            'ownerName', 'ownerEmail', 'ownerPhone', 'ownerPhoto', 'ownerCity',
+            'updatedAt', 'updatedBy'
+          ]))
+        // Booking creation reserves the single slot.
+        || (signedIn()
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && resource.data.status == 'Approved'
+          && resource.data.availability == 'Available'
+          && resource.data.availableSlots == 1
+          && request.resource.data.availability == 'Occupied'
+          && request.resource.data.availableSlots == 0
+          && request.resource.data.occupiedSlots == 1
+          && request.resource.data.totalSlots == 1
+          && changedOnly([
+            'availability', 'availableSlots', 'occupiedSlots', 'totalSlots',
+            'updatedAt'
+          ]))
+        // Owner rejection releases the slot.
+        || (signedIn()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.availability == 'Available'
+          && request.resource.data.availableSlots == 1
+          && request.resource.data.occupiedSlots == 0
+          && request.resource.data.totalSlots == 1
+          && changedOnly([
+            'availability', 'availableSlots', 'occupiedSlots', 'totalSlots',
+            'updatedAt'
+          ]));
+
+      allow delete: if isAdmin() ||
+        (signedIn()
+          && resource.data.ownerUid == request.auth.uid
+          && resource.data.availability != 'Occupied');
+    }
+
+    // ---------- Bookings ----------
+    match /bookings/{bookingId} {
+      allow read: if isAdmin() ||
+        (signedIn() && (
+          resource.data.customerUid == request.auth.uid ||
+          resource.data.ownerUid == request.auth.uid
+        ));
+
+      // Compatible with the current browser booking flow. Amounts and Razorpay
+      // verification should ultimately be written by a trusted server endpoint.
+      allow create: if signedIn()
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.bookingStatus == 'Pending Approval'
+        && request.resource.data.ownerApprovalStatus == 'Pending'
+        && request.resource.data.paymentStatus == 'Captured'
+        && request.resource.data.paymentVerificationStatus == 'Verified'
+        && request.resource.data.paymentCaptured == true
+        && request.resource.data.ownerPayoutStatus == 'Not Eligible'
+        && request.resource.data.settlementStatus == 'Pending'
+        && request.resource.data.parkingAmount is number
+        && request.resource.data.platformFeeAmount is number
+        && request.resource.data.customerPaidAmount is number
+        && request.resource.data.ownerReceivableAmount is number
+        && request.resource.data.customerPaidAmount ==
+             request.resource.data.parkingAmount + request.resource.data.platformFeeAmount
+        && request.resource.data.ownerReceivableAmount == request.resource.data.parkingAmount
+        && request.resource.data.platformFeePercent == 10;
+
+      // Parking owner can approve or reject only bookings assigned to them.
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.customerUid == resource.data.customerUid
+          && resource.data.bookingStatus == 'Pending Approval'
+          && (
+            (
+              request.resource.data.bookingStatus == 'Approved'
+              && request.resource.data.ownerApprovalStatus == 'Approved'
+              && changedOnly([
+                'bookingStatus', 'ownerApprovalStatus', 'approvedDate',
+                'updatedAt'
+              ])
+            )
+            ||
+            (
+              request.resource.data.bookingStatus == 'Rejected'
+              && request.resource.data.ownerApprovalStatus == 'Rejected'
+              && request.resource.data.paymentStatus == 'Refund Pending'
+              && request.resource.data.refundStatus == 'Pending'
+              && request.resource.data.ownerPayoutStatus == 'Not Eligible'
+              && request.resource.data.slotReleased == true
+              && changedOnly([
+                'bookingStatus', 'ownerApprovalStatus', 'paymentStatus',
+                'refundStatus', 'refundAmount', 'cancelledAt',
+                'refundRequestedAt', 'cancellationType',
+                'cancellationRemarks', 'ownerPayoutStatus', 'slotReleased',
+                'slotReleasedAt', 'updatedAt'
+              ])
+            )
+          ))
+        // Customer cancellation before owner approval.
+        || (signedIn()
+          && resource.data.customerUid == request.auth.uid
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && resource.data.bookingStatus == 'Pending Approval'
+          && request.resource.data.bookingStatus in ['Cancelled', 'Rejected']
+          && request.resource.data.paymentStatus == 'Refund Pending'
+          && request.resource.data.refundStatus == 'Pending'
+          && request.resource.data.slotReleased == true
+          && changedOnly([
+            'bookingStatus', 'paymentStatus', 'refundStatus', 'refundAmount',
+            'refundRequested', 'refundRequestedAt', 'cancelledAt',
+            'cancellationType', 'cancellationRemarks', 'slotReleased',
+            'slotReleasedAt', 'updatedAt'
+          ]));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Payments ----------
+    match /payments/{paymentId} {
+      allow read: if isAdmin() ||
+        (signedIn() && (
+          resource.data.customerUid == request.auth.uid ||
+          resource.data.ownerUid == request.auth.uid
+        ));
+
+      // Compatibility rule for the current client-side payment document create.
+      // See the security note supplied with this file.
+      allow create: if signedIn()
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.paymentStatus == 'Captured'
+        && request.resource.data.paymentVerificationStatus == 'Verified'
+        && request.resource.data.paymentCaptured == true
+        && request.resource.data.settlementStatus == 'Pending'
+        && request.resource.data.ownerPayoutStatus == 'Not Eligible'
+        && request.resource.data.refundStatus == 'Not Applicable'
+        && request.resource.data.customerPaidAmount is number
+        && request.resource.data.parkingAmount is number
+        && request.resource.data.platformFeeAmount is number
+        && request.resource.data.ownerReceivableAmount is number
+        && request.resource.data.customerPaidAmount ==
+             request.resource.data.parkingAmount + request.resource.data.platformFeeAmount
+        && request.resource.data.ownerReceivableAmount == request.resource.data.parkingAmount
+        && request.resource.data.platformFeePercent == 10;
+
+      allow update: if isAdmin()
+        // Owner mirrors approval/rejection status to the related payment record.
+        || (signedIn()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.customerUid == resource.data.customerUid
+          && (
+            (
+              request.resource.data.bookingStatus == 'Approved'
+              && request.resource.data.ownerApprovalStatus == 'Approved'
+              && changedOnly([
+                'bookingStatus', 'ownerApprovalStatus', 'approvedDate',
+                'updatedAt'
+              ])
+            )
+            ||
+            (
+              request.resource.data.bookingStatus == 'Rejected'
+              && request.resource.data.ownerApprovalStatus == 'Rejected'
+              && request.resource.data.paymentStatus == 'Refund Pending'
+              && request.resource.data.refundStatus == 'Pending'
+              && request.resource.data.ownerPayoutStatus == 'Not Eligible'
+              && changedOnly([
+                'bookingStatus', 'ownerApprovalStatus', 'paymentStatus',
+                'refundStatus', 'refundAmount', 'cancelledAt',
+                'refundRequestedAt', 'cancellationType',
+                'cancellationRemarks', 'ownerPayoutStatus', 'updatedAt'
+              ])
+            )
+          ))
+        // Customer may request a refund for their own pending booking/payment.
+        || (signedIn()
+          && resource.data.customerUid == request.auth.uid
+          && request.resource.data.customerUid == resource.data.customerUid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.paymentStatus == 'Refund Pending'
+          && request.resource.data.refundStatus == 'Pending'
+          && changedOnly([
+            'bookingStatus', 'paymentStatus', 'refundStatus', 'refundAmount',
+            'refundRequestedAt', 'cancelledAt', 'cancellationType',
+            'cancellationRemarks', 'updatedAt'
+          ]));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Notifications ----------
+    match /notifications/{notificationId} {
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.recipientUid == request.auth.uid);
+
+      // Current sendNotification helper writes directly from the browser.
+      allow create: if signedIn()
+        && request.resource.data.recipientUid is string
+        && request.resource.data.recipientUid.size() > 0
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 1000
+        && request.resource.data.read == false;
+
+      allow update: if isAdmin() ||
+        (signedIn()
+          && resource.data.recipientUid == request.auth.uid
+          && request.resource.data.recipientUid == resource.data.recipientUid
+          && changedOnly(['read', 'readAt']));
+
+      allow delete: if isAdmin() ||
+        (signedIn() && resource.data.recipientUid == request.auth.uid);
+    }
+
+    // ---------- Wishlist ----------
+    match /wishlist/{wishlistId} {
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.userUid == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.userUid == request.auth.uid;
+
+      allow update: if signedIn()
+        && resource.data.userUid == request.auth.uid
+        && request.resource.data.userUid == resource.data.userUid;
+
+      allow delete: if isAdmin() ||
+        (signedIn() && resource.data.userUid == request.auth.uid);
+    }
+
+    // ---------- Support tickets ----------
+    match /tickets/{ticketId} {
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.userUid == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.status in ['Open', 'Pending'];
+
+      allow update: if isAdmin() ||
+        (signedIn()
+          && resource.data.userUid == request.auth.uid
+          && request.resource.data.userUid == resource.data.userUid
+          && request.resource.data.status == resource.data.status
+          && changedOnly(['category', 'title', 'description', 'updatedAt']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Login audit ----------
+    match /logins/{loginId} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ---------- Counters ----------
+    // Existing client signup flows may use a transaction to allocate readable
+    // IDs. Authenticated users may increment numeric counters only by one.
+    match /counters/{counterId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.count == 1;
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+        && request.resource.data.count == resource.data.count + 1;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Backend-managed sensitive collections ----------
+    // Firebase Admin SDK in API routes and Cloud Functions bypasses these rules.
+    match /razorpayWebhookEvents/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /settlementReconciliation/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /settlementReconciliationRuns/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /settlements/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---------- Reviews ----------
+match /reviews/{reviewId} {
+
+  // Anyone can read reviews for approved/public parking.
+  allow read: if true;
+
+  // Signed-in users can create reviews.
+  allow create: if signedIn()
+    && request.resource.data.userUid == request.auth.uid
+    && request.resource.data.parkingId is string
+    && request.resource.data.rating is number
+    && request.resource.data.rating >= 1
+    && request.resource.data.rating <= 5
+    && request.resource.data.review is string
+    && request.resource.data.review.size() <= 500;
+
+  // Users can edit only their own review.
+  allow update: if signedIn()
+    && resource.data.userUid == request.auth.uid
+    && request.resource.data.userUid == resource.data.userUid
+    && request.resource.data.parkingId == resource.data.parkingId
+    && changedOnly([
+      'review',
+      'rating',
+      'updatedAt'
+    ]);
+
+  // Users can delete their own review.
+  allow delete: if isAdmin()
+    || (signedIn()
+      && resource.data.userUid == request.auth.uid);
+}
+
+    // ---------- Default deny ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

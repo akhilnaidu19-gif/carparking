@@ -29,10 +29,11 @@ import {
 
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app } from "@/lib/firebase";
+import { sendNotification } from "@/lib/notifications";
 
 export default function BookingPage() {
 
-  
+  const auth = getAuth();
 
   const params = useParams();
   const router = useRouter();
@@ -82,26 +83,29 @@ const customerPaidAmount =
 const ownerReceivableAmount =
   parkingAmount;
 
-  useEffect(() => {
-
-  const loadParking = async () => {
-
-    const parkingDoc = await getDoc(
-      doc(
-        db,
-        "parkings",
-        params.id as string
-      )
-    );
-
-    if (parkingDoc.exists()) {
-      setParkingData(parkingDoc.data());
+ useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      console.log("User is not authenticated yet.");
+      return;
     }
 
-  };
+    try {
+      const parkingDoc = await getDoc(
+        doc(db, "parkings", params.id as string)
+      );
 
-  loadParking();
+      if (parkingDoc.exists()) {
+        setParkingData(parkingDoc.data());
+      } else {
+        console.log("Parking document not found.");
+      }
+    } catch (error) {
+      console.error("Error loading parking:", error);
+    }
+  });
 
+  return () => unsubscribe();
 }, [params.id]);
 
 useEffect(() => {
@@ -292,7 +296,16 @@ useEffect(() => {
   params.id as string
 );
 
-const parkingDoc = await getDoc(parkingRef);
+let parkingDoc;
+
+try {
+  parkingDoc = await getDoc(parkingRef);
+  console.log("PARKING READ SUCCESS");
+} catch (error) {
+  console.error("PARKING READ FAILED:", error);
+  alert("Parking read failed. Check console.");
+  return;
+}
 
 if (!parkingDoc.exists()) {
   alert("Parking not found.");
@@ -322,8 +335,16 @@ where(
   )
 );
 
-const existingBooking =
-  await getDocs(existingBookingQuery);
+let existingBooking;
+
+try {
+  existingBooking = await getDocs(existingBookingQuery);
+  console.log("EXISTING BOOKING QUERY SUCCESS");
+} catch (error) {
+  console.error("EXISTING BOOKING QUERY FAILED:", error);
+  alert("Existing booking query failed. Check console.");
+  return;
+}
 
 const alreadyBooked =
   existingBooking.docs.find((doc) => {
@@ -353,7 +374,7 @@ if (alreadyBooked) {
 
 // CHECK WHETHER SOMEONE ELSE HAS ALREADY BOOKED THIS SLOT
 
-const occupiedQuery = query(
+/*const occupiedQuery = query(
   collection(db, "bookings"),
   where(
     "parkingId",
@@ -362,8 +383,16 @@ const occupiedQuery = query(
   )
 );
 
-const occupiedBooking =
-  await getDocs(occupiedQuery);
+let occupiedBooking;
+
+try {
+  occupiedBooking = await getDocs(occupiedQuery);
+  console.log("OCCUPIED BOOKING QUERY SUCCESS");
+} catch (error) {
+  console.error("OCCUPIED BOOKING QUERY FAILED:", error);
+  alert("Occupied booking query failed. Check console.");
+  return;
+}
 
 const activeBooking =
   occupiedBooking.docs.find((doc) => {
@@ -385,7 +414,7 @@ if (activeBooking) {
 
   return;
 
-}
+}*/
 
 
 
@@ -461,17 +490,9 @@ const customerData = customerDoc.exists()
   : null;
 
   // Get Owner Details
-const ownerDoc = await getDoc(
-doc(
-  db,
-  "users",
-  parkingData?.ownerUid || ""
-)
-);
-
-const ownerData = ownerDoc.exists()
-  ? ownerDoc.data()
-  : null;
+const ownerData = {
+  photo: parkingData?.ownerPhoto || "",
+};
 
 if (
   Number(
@@ -678,35 +699,48 @@ handler: async function (
   );
 
   try {
-    const verificationResponse =
-      await fetch(
-        "/api/verify-payment",
-        {
-          method: "POST",
+    const idToken =
+  await currentUser?.getIdToken();
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+if (!idToken) {
+  alert(
+    "Your login session has expired. Please login again."
+  );
+  return;
+}
 
-          body: JSON.stringify({
-            razorpayOrderId:
-              response
-                .razorpay_order_id,
+const verificationResponse =
+  await fetch(
+    "/api/verify-payment",
+    {
+      method: "POST",
 
-            razorpayPaymentId:
-              response
-                .razorpay_payment_id,
+      headers: {
+        "Content-Type":
+          "application/json",
 
-            razorpaySignature:
-              response
-                .razorpay_signature,
+        Authorization:
+          `Bearer ${idToken}`,
+      },
 
-            expectedAmount:
-              customerPaidAmount,
-          }),
-        }
-      );
+      body: JSON.stringify({
+        razorpayOrderId:
+          response.razorpay_order_id,
+
+        razorpayPaymentId:
+          response.razorpay_payment_id,
+
+        razorpaySignature:
+          response.razorpay_signature,
+
+        expectedAmount:
+          customerPaidAmount,
+
+        bookingData:
+          bookingData,
+      }),
+    }
+  );
 
     const verificationResult =
       await verificationResponse.json();
@@ -722,238 +756,6 @@ handler: async function (
 
       return;
     }
-
-    const verifiedPayment =
-      verificationResult.payment;
-
-    const bookingReference = await addDoc(
-  collection(
-    db,
-    "bookings"
-  ),
-  {
-    ...bookingData,
-
-    razorpayPaymentId:
-      response.razorpay_payment_id,
-
-    razorpayOrderId:
-      response.razorpay_order_id,
-
-    razorpaySignature:
-      response.razorpay_signature,
-
-    paymentStatus:
-      "Captured",
-
-    paymentVerificationStatus:
-      "Verified",
-
-    paymentMethod:
-      verifiedPayment.method ||
-      "Razorpay",
-
-    paymentCurrency:
-      verifiedPayment.currency ||
-      "INR",
-
-    verifiedPaymentAmount:
-      Number(
-        verifiedPayment.amount || 0
-      ),
-
-    paymentCaptured:
-      verifiedPayment.captured === true,
-
-    paymentCapturedAt:
-      new Date(),
-
-    paymentVerifiedAt:
-      new Date(),
-
-    paymentCreatedAt:
-      new Date(),
-
-    settlementStatus:
-      "Pending",
-
-    settlementId:
-      "",
-
-    settlementUtr:
-      "",
-
-    ownerPayoutStatus:
-      "Not Eligible",
-  }
-);
-
-/* CREATE PAYMENT TRANSACTION */
-
-await addDoc(
-  collection(
-    db,
-    "payments"
-  ),
-  {
-    bookingDocumentId:
-      bookingReference.id,
-
-    bookingId:
-      bookingData.bookingId,
-
-    customerUid:
-      currentUser.uid,
-
-    customerId:
-      currentUserData?.userId || "",
-
-    customerName:
-      currentUserData?.name || "",
-
-    customerEmail:
-      currentUserData?.email ||
-      currentUser.email ||
-      "",
-
-    customerPhone:
-      currentUserData?.phone || "",
-
-    ownerUid:
-      parkingData?.ownerUid || "",
-
-    ownerId:
-      parkingData?.ownerId || "",
-
-    ownerName:
-      parkingData?.ownerName || "",
-
-    ownerEmail:
-      parkingData?.ownerEmail || "",
-
-    ownerPhone:
-      parkingData?.ownerPhone || "",
-
-    parkingId:
-      parkingDoc.id,
-
-    parkingTitle:
-      parkingData?.title || "",
-
-    razorpayPaymentId:
-      response.razorpay_payment_id,
-
-    razorpayOrderId:
-      response.razorpay_order_id,
-
-    razorpaySignature:
-      response.razorpay_signature,
-
-    customerPaidAmount:
-      Number(customerPaidAmount),
-
-    parkingAmount:
-      Number(parkingAmount),
-
-    platformFeePercent:
-      Number(platformFeePercent),
-
-    platformFeeAmount:
-      Number(platformFeeAmount),
-
-    ownerReceivableAmount:
-      Number(ownerReceivableAmount),
-
-    paymentMethod:
-      verifiedPayment.method ||
-      "Razorpay",
-
-    paymentCurrency:
-      verifiedPayment.currency ||
-      "INR",
-
-    paymentStatus:
-      "Captured",
-
-    paymentVerificationStatus:
-      "Verified",
-
-    paymentCaptured:
-      verifiedPayment.captured === true,
-
-    paymentCapturedAt:
-      new Date(),
-
-    paymentVerifiedAt:
-      new Date(),
-
-    settlementStatus:
-      "Pending",
-
-    settlementId:
-      "",
-
-    settlementAmount:
-      0,
-
-    settlementFee:
-      0,
-
-    settlementTax:
-      0,
-
-    settlementUtr:
-      "",
-
-    settledAt:
-      null,
-
-    refundStatus:
-      "Not Applicable",
-
-    refundAmount:
-      0,
-
-    razorpayRefundId:
-      "",
-
-    refundRequestedAt:
-      null,
-
-    refundProcessedAt:
-      null,
-
-    ownerPayoutStatus:
-      "Not Eligible",
-
-    ownerPayoutReference:
-      "",
-
-    ownerPaidAt:
-      null,
-
-    transactionType:
-      "Parking Booking",
-
-    createdAt:
-      new Date(),
-
-    updatedAt:
-      new Date(),
-  }
-);
-
-await updateDoc(
-  parkingRef,
-  {
-    availableSlots: increment(-1),
-    occupiedSlots: increment(1),
-    availability:
-      Number(latestParking.availableSlots) === 1
-        ? "Occupied"
-        : "Available",
-  }
-);
 
 alert(
   "Payment verified successfully. Your booking has been created."

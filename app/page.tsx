@@ -175,13 +175,10 @@ onSnapshot(
 
         },
 
-        (error) => {
-
-          console.log(error);
-
-          setLoading(false);
-
-        }
+(error) => {
+  console.error("HOME PARKING LISTENER ERROR:", error);
+  setLoading(false);
+}
 
       );
 

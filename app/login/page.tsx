@@ -1,36 +1,80 @@
 "use client";
 
-import { useState } from "react";
-
+import { useEffect, useRef, useState } from "react";
 import {
+  ConfirmationResult,
   getAuth,
   RecaptchaVerifier,
   signInWithPhoneNumber,
+  signOut,
 } from "firebase/auth";
-
 import {
   addDoc,
   collection,
   doc,
   getDoc,
-  getDocs,
-  query,
-  where,
+  serverTimestamp,
 } from "firebase/firestore";
-
 import { useRouter } from "next/navigation";
-
 import { app, db } from "@/lib/firebase";
 
 export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
+  const [confirmationResult, setConfirmationResult] =
+    useState<ConfirmationResult | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const auth = getAuth(app);
   const router = useRouter();
+
+  const clearRecaptcha = () => {
+    try {
+      recaptchaVerifierRef.current?.clear();
+    } catch (error) {
+      console.warn("Unable to clear reCAPTCHA cleanly:", error);
+    }
+
+    recaptchaVerifierRef.current = null;
+
+    const container = document.getElementById("recaptcha-container");
+    if (container) {
+      container.innerHTML = "";
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearRecaptcha();
+    };
+  }, []);
+
+  const createRecaptchaVerifier = async () => {
+    clearRecaptcha();
+
+    const container = document.getElementById("recaptcha-container");
+
+    if (!container) {
+      throw new Error("reCAPTCHA container is not available.");
+    }
+
+    const verifier = new RecaptchaVerifier(
+      auth,
+      "recaptcha-container",
+      {
+        size: "invisible",
+      }
+    );
+
+    recaptchaVerifierRef.current = verifier;
+
+    // Render before requesting OTP so Firebase always uses the current DOM node.
+    await verifier.render();
+
+    return verifier;
+  };
 
   const sendOtp = async () => {
     if (!/^[6-9]\d{9}$/.test(phone)) {
@@ -41,31 +85,7 @@ export default function LoginPage() {
     try {
       setLoading(true);
 
-      const userQuery = query(
-  collection(db, "users"),
-  where("phone", "==", `+91${phone}`)
-);
-
-const userSnapshot = await getDocs(userQuery);
-
-if (userSnapshot.empty) {
-  alert(
-    "No account found with this mobile number.\n\nPlease register first."
-  );
-  return;
-}
-
-      if (!(window as any).loginRecaptchaVerifier) {
-  (window as any).loginRecaptchaVerifier = new RecaptchaVerifier(
-    auth,
-    "recaptcha-container",
-    {
-      size: "invisible",
-    }
-  );
-}
-
-const recaptchaVerifier = (window as any).loginRecaptchaVerifier;
+      const recaptchaVerifier = await createRecaptchaVerifier();
 
       const confirmation = await signInWithPhoneNumber(
         auth,
@@ -75,13 +95,25 @@ const recaptchaVerifier = (window as any).loginRecaptchaVerifier;
 
       setConfirmationResult(confirmation);
       setOtpSent(true);
-
       alert("OTP sent successfully.");
-    } catch (error) {
-      console.log(error);
-alert(
-  "No account found with this mobile number.\n\nPlease create a new account first."
-);
+    } catch (error: any) {
+      console.error("Send OTP error:", error);
+
+      clearRecaptcha();
+
+      if (error?.code === "auth/too-many-requests") {
+        alert(
+          "Too many OTP requests were made. Please wait for some time and try again."
+        );
+      } else if (error?.code === "auth/invalid-phone-number") {
+        alert("The mobile number is invalid.");
+      } else if (error?.code === "auth/quota-exceeded") {
+        alert("Firebase OTP quota has been exceeded. Please try again later.");
+      } else if (error?.code === "auth/captcha-check-failed") {
+        alert("reCAPTCHA verification failed. Please refresh and try again.");
+      } else {
+        alert("Unable to send OTP. Please refresh the page and try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -93,8 +125,8 @@ alert(
       return;
     }
 
-    if (otp.length !== 6) {
-      alert("Enter valid 6-digit OTP.");
+    if (!/^\d{6}$/.test(otp)) {
+      alert("Enter a valid 6-digit OTP.");
       return;
     }
 
@@ -107,17 +139,21 @@ alert(
       const userDoc = await getDoc(doc(db, "users", user.uid));
 
       if (!userDoc.exists()) {
-        alert("Account not found. Please sign up first.");
-        await auth.signOut();
-        router.push("/signup");
+        await signOut(auth);
+
+        alert(
+          "No CarParking Bangalore profile is linked to this mobile login. Please create an account first."
+        );
+
+        router.replace("/signup");
         return;
       }
 
       const userData = userDoc.data();
 
       if (userData?.status === "Blocked") {
+        await signOut(auth);
         alert("Your account has been blocked by Admin.");
-        await auth.signOut();
         return;
       }
 
@@ -128,24 +164,51 @@ alert(
         email: userData?.email || "",
         name: userData?.name || "User",
         photo: userData?.photoURL || userData?.photo || "",
-        loginTime: new Date().toLocaleString(),
-        device: navigator.platform,
-        browser: navigator.userAgent,
+        loginTime: serverTimestamp(),
+        device: navigator.platform || "Unknown",
+        browser: navigator.userAgent || "Unknown",
         online: true,
       });
 
+      clearRecaptcha();
       alert("Login Successful");
 
       if (userData?.role === "admin") {
-        router.push("/admin");
+        router.replace("/admin");
       } else {
-        router.push("/");
+        router.replace("/");
       }
-    } catch (error) {
-      console.log(error);
-      alert("OTP verification failed.");
+    } catch (error: any) {
+      console.error("OTP verification error:", error);
+
+      if (error?.code === "auth/invalid-verification-code") {
+        alert("The OTP is incorrect. Please check it and try again.");
+      } else if (error?.code === "auth/code-expired") {
+        alert("The OTP has expired. Please request a new OTP.");
+        setOtpSent(false);
+        setOtp("");
+        setConfirmationResult(null);
+        clearRecaptcha();
+      } else if (error?.code === "permission-denied") {
+        alert(
+          "OTP was verified, but your profile could not be accessed due to Firestore permissions."
+        );
+      } else {
+        alert("OTP verification failed. Please try again.");
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const changeMobileNumber = async () => {
+    setOtp("");
+    setOtpSent(false);
+    setConfirmationResult(null);
+    clearRecaptcha();
+
+    if (auth.currentUser) {
+      await signOut(auth);
     }
   };
 
@@ -158,16 +221,14 @@ alert(
           </div>
         </div>
 
-        <h1 className="text-4xl font-bold text-center mb-3">
-          Welcome Back
-        </h1>
+        <h1 className="text-4xl font-bold text-center mb-3">Welcome Back</h1>
 
         <p className="text-center text-gray-500 mb-8">
           Login using your mobile number
         </p>
 
         <div className="mb-5">
-          <label className="block font-semibold mb-2">
+          <label htmlFor="login-phone" className="block font-semibold mb-2">
             Mobile Number
           </label>
 
@@ -177,22 +238,27 @@ alert(
             </span>
 
             <input
+              id="login-phone"
+              name="phone"
               type="text"
+              inputMode="numeric"
+              autoComplete="tel-national"
               placeholder="9876543210"
               value={phone}
-              disabled={otpSent}
-              onChange={(e) =>
-                setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+              disabled={otpSent || loading}
+              onChange={(event) =>
+                setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))
               }
               className="w-full border border-l-0 p-4 rounded-r-2xl disabled:bg-gray-100"
             />
           </div>
         </div>
 
-        <div id="recaptcha-container"></div>
+        <div id="recaptcha-container" />
 
         {!otpSent ? (
           <button
+            type="button"
             onClick={sendOtp}
             disabled={loading}
             className="w-full bg-black text-white py-4 rounded-2xl font-bold text-xl disabled:bg-gray-400"
@@ -201,22 +267,41 @@ alert(
           </button>
         ) : (
           <>
+            <label htmlFor="login-otp" className="sr-only">
+              Enter OTP
+            </label>
+
             <input
+              id="login-otp"
+              name="otp"
               type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
               placeholder="Enter OTP"
               value={otp}
-              onChange={(e) =>
-                setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+              disabled={loading}
+              onChange={(event) =>
+                setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
               }
-              className="w-full border p-4 rounded-2xl mt-5"
+              className="w-full border p-4 rounded-2xl mt-5 disabled:bg-gray-100"
             />
 
             <button
+              type="button"
               onClick={verifyOtpAndLogin}
               disabled={loading}
               className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-xl mt-5 disabled:bg-gray-400"
             >
               {loading ? "Verifying..." : "Verify OTP & Login"}
+            </button>
+
+            <button
+              type="button"
+              onClick={changeMobileNumber}
+              disabled={loading}
+              className="w-full text-gray-600 font-semibold mt-4 hover:text-black disabled:text-gray-400"
+            >
+              Change Mobile Number
             </button>
           </>
         )}
@@ -229,6 +314,7 @@ alert(
           <p className="text-gray-600">
             Don&apos;t have an account?{" "}
             <button
+              type="button"
               onClick={() => router.push("/signup")}
               className="text-green-600 font-bold hover:underline"
             >

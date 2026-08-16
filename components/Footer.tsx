@@ -41,29 +41,32 @@ useEffect(() => {
     collection(db, "ownerApplications"),
 
     where(
-      "userEmail",
+      "userUid",
       "==",
-      user.email
+      user.uid
     )
 
   );
 
-  const unsubscribe =
-    onSnapshot(q, (snapshot) => {
-
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
       if (snapshot.empty) {
-
         setOwnerStatus("NotOwner");
-
       } else {
-
         setOwnerStatus(
           snapshot.docs[0].data().status
         );
-
       }
-
-    });
+    },
+    (error) => {
+      console.error(
+        "FOOTER OWNER STATUS LISTENER ERROR:",
+        error
+      );
+      setOwnerStatus("NotOwner");
+    }
+  );
 
   return () => unsubscribe();
 

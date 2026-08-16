@@ -196,35 +196,22 @@ export default function ProfilePage() {
         // FIRESTORE SAVE
 
         await setDoc(
-  doc(
-    db,
-    "users",
-    user.uid
-  ),
-
+  doc(db, "users", user.uid),
   {
-    name,
-    phone,
-    city,
+    name: name.trim(),
+    phone: phone.trim(),
+    city: city.trim(),
 
-    photoURL:
-      uploadedPhoto,
+    photoURL: uploadedPhoto,
 
-    email:
-      user.email,
+    email: user.email || "",
 
-    verified:
-      false,
-
-updatedAt: serverTimestamp(),
-updatedBy: user.uid,
-
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid,
   },
-
   {
     merge: true,
   }
-
 );
 
         localStorage.setItem(
@@ -273,15 +260,20 @@ localStorage.setItem(
           "Profile Updated Successfully"
         );
 
-      } catch (error) {
+} catch (error: any) {
+  console.error("PROFILE UPDATE ERROR:", error);
 
-        console.log(error);
-
-        alert(
-          "Error Updating Profile"
-        );
-
-      } finally {
+  if (error?.code === "permission-denied") {
+    alert(
+      "Profile update was blocked by Firestore security rules."
+    );
+  } else {
+    alert(
+      error?.message ||
+        "Error Updating Profile"
+    );
+  }
+} finally {
 
         setLoading(false);
 

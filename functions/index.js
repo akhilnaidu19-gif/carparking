@@ -83,32 +83,32 @@ exports.autoCompleteBookings =
 
           // 1. Update booking document
           await bookingDoc.ref.update({
-            bookingStatus:
-              "Completed",
+  bookingStatus:
+    "Completed",
 
-            paymentStatus:
-              "Ready For Payout",
+  paymentStatus:
+    "Ready For Payout",
 
-            ownerPayoutStatus:
-              "Pending",
+  ownerPayoutStatus:
+    "Pending",
 
-            completedDate:
-              completedAt,
+  completedDate:
+    completedAt,
 
-            updatedAt:
-              completedAt,
-          });
+  updatedAt:
+    completedAt,
+});
 
           // 2. Update linked payment document
-          const paymentSnapshot =
-            await db
-              .collection("payments")
-              .where(
-                "bookingDocumentId",
-                "==",
-                bookingDoc.id
-              )
-              .get();
+const paymentSnapshot =
+  await db
+    .collection("payments")
+    .where(
+      "bookingId",
+      "==",
+      booking.bookingId
+    )
+    .get();
 
           if (
             paymentSnapshot.empty
@@ -123,27 +123,30 @@ exports.autoCompleteBookings =
               paymentSnapshot.docs.map(
                 (paymentDoc) =>
                   paymentDoc.ref.update({
-                    bookingStatus:
-                      "Completed",
+  bookingStatus:
+    "Completed",
 
-                    paymentStatus:
-                      "Ready For Payout",
+  paymentStatus:
+    "Ready For Payout",
 
-                    ownerPayoutStatus:
-                      "Pending",
+  ownerPayoutStatus:
+    "Pending",
 
-                    eligibleForPayout:
-                      true,
+  settlementStatus:
+    "Pending",
 
-                    payoutEligibleAt:
-                      completedAt,
+  eligibleForPayout:
+    true,
 
-                    completedDate:
-                      completedAt,
+  payoutEligibleAt:
+    completedAt,
 
-                    updatedAt:
-                      completedAt,
-                  })
+  completedDate:
+    completedAt,
+
+  updatedAt:
+    completedAt,
+})
               );
 
             await Promise.all(

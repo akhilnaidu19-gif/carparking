@@ -23,6 +23,8 @@ import {
 
 import { app, db } from "@/lib/firebase";
 
+import { sendNotification } from "@/lib/notifications";
+
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
@@ -216,19 +218,10 @@ setEarnings(total);
   if (!user) return;
 
   const q = query(
-
-    collection(
-      db,
-      "notifications"
-    ),
-
-where(
-  "ownerUid",
-  "==",
-  user.uid
-)
-
-  );
+  collection(db, "notifications"),
+  where("recipientUid", "==", user.uid),
+  orderBy("createdAt", "desc")
+);
 
   const unsubscribe =
     onSnapshot(
@@ -237,23 +230,12 @@ where(
 
       (snapshot) => {
 
-        const data: any[] = [];
+        const data = snapshot.docs.map((doc) => ({
+  id: doc.id,
+  ...doc.data(),
+}));
 
-        snapshot.forEach((doc) => {
-
-          data.push({
-
-            id: doc.id,
-
-            ...doc.data(),
-
-          });
-
-        });
-
-        setNotifications(
-          data.reverse()
-        );
+setNotifications(data);
 
       }
 
@@ -1611,6 +1593,22 @@ if (!paymentSnapshot.empty) {
 
 alert("Booking Approved");
 
+try {
+  await sendNotification({
+    recipientUid: booking.customerUid,
+    recipientRole: "customer",
+    title: "Booking Approved",
+    message: `Your booking for "${booking.parkingTitle || "the parking"}" has been approved by the parking owner.`,
+    type: "BOOKING",
+    relatedId: booking.id,
+  });
+} catch (notificationError) {
+  console.error(
+    "Unable to send booking approval notification:",
+    notificationError
+  );
+}
+
 } catch (error) {
 
   console.log(error);
@@ -1860,6 +1858,22 @@ if (
           }
         );
       }
+
+      try {
+  await sendNotification({
+    recipientUid: booking.customerUid,
+    recipientRole: "customer",
+    title: "Booking Rejected",
+    message: `Your booking for "${booking.parkingTitle || "the parking"}" was rejected by the parking owner. Your refund request has been created.`,
+    type: "BOOKING",
+    relatedId: booking.id,
+  });
+} catch (notificationError) {
+  console.error(
+    "Unable to send booking rejection notification:",
+    notificationError
+  );
+}
 
       alert(
         "Booking rejected. Parking slot released and refund request created."
