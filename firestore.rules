@@ -149,6 +149,18 @@ service cloud.firestore {
             'updatedAt'
           ]));
 
+          // Customer cancellation releases the parking slot.
+|| (signedIn()
+  && resource.data.availability == 'Occupied'
+  && request.resource.data.availability == 'Available'
+  && request.resource.data.availableSlots == resource.data.availableSlots + 1
+  && request.resource.data.occupiedSlots == resource.data.occupiedSlots - 1
+  && changedOnly([
+    'availableSlots',
+    'occupiedSlots',
+    'availability'
+  ]))
+
       allow delete: if isAdmin() ||
         (signedIn()
           && resource.data.ownerUid == request.auth.uid
@@ -217,24 +229,67 @@ service cloud.firestore {
             )
           ))
         // Customer cancellation before owner approval.
-        || (signedIn()
-          && resource.data.customerUid == request.auth.uid
-          && request.resource.data.customerUid == resource.data.customerUid
-          && request.resource.data.ownerUid == resource.data.ownerUid
-          && resource.data.bookingStatus == 'Pending Approval'
-          && request.resource.data.bookingStatus in ['Cancelled', 'Rejected']
-          && request.resource.data.paymentStatus == 'Refund Pending'
-          && request.resource.data.refundStatus == 'Pending'
-          && request.resource.data.slotReleased == true
-          && changedOnly([
-            'bookingStatus', 'paymentStatus', 'refundStatus', 'refundAmount',
-            'refundRequested', 'refundRequestedAt', 'cancelledAt',
-            'cancellationType', 'cancellationRemarks', 'slotReleased',
-            'slotReleasedAt', 'updatedAt'
-          ]));
+|| (signedIn()
+  && resource.data.customerUid == request.auth.uid
+  && request.resource.data.customerUid == resource.data.customerUid
+  && request.resource.data.ownerUid == resource.data.ownerUid
+  && resource.data.bookingStatus == 'Pending Approval'
+  && request.resource.data.bookingStatus == 'Cancelled Before Approval'
+  && request.resource.data.ownerApprovalStatus == 'Cancelled'
+  && request.resource.data.paymentStatus == 'Refund Pending'
+  && request.resource.data.refundStatus == 'Pending'
+  && request.resource.data.refundAmount is number
+  && request.resource.data.platformFeeAmount is number
+  && request.resource.data.platformFeeRefunded == false
+  && request.resource.data.ownerPayoutStatus == 'Not Applicable'
+  && request.resource.data.cancellationType == 'Before Owner Approval'
+  && request.resource.data.cancelledBy == 'Customer'
+  && changedOnly([
+    'bookingStatus',
+    'ownerApprovalStatus',
+    'paymentStatus',
+    'cancellationType',
+    'cancelledBy',
+    'cancelledAt',
+    'refundAmount',
+    'refundStatus',
+    'platformFeeAmount',
+    'platformFeeRefunded',
+    'ownerPayoutStatus',
+    'refundRemarks'
+  ]))
 
-      allow delete: if isAdmin();
-    }
+  // Customer cancellation after owner approval.
+|| (signedIn()
+  && resource.data.customerUid == request.auth.uid
+  && request.resource.data.customerUid == resource.data.customerUid
+  && request.resource.data.ownerUid == resource.data.ownerUid
+  && resource.data.bookingStatus == 'Approved'
+  && resource.data.ownerApprovalStatus == 'Approved'
+  && request.resource.data.bookingStatus == 'Cancelled After Approval'
+  && request.resource.data.ownerApprovalStatus == 'Approved'
+  && request.resource.data.paymentStatus == 'Paid'
+  && request.resource.data.refundAmount == 0
+  && request.resource.data.refundStatus == 'Not Applicable'
+  && request.resource.data.platformFeeRefunded == false
+  && request.resource.data.ownerPayoutStatus == 'Pending'
+  && request.resource.data.ownerReceivableAmount ==
+       resource.data.ownerReceivableAmount
+  && request.resource.data.cancellationType == 'After Owner Approval'
+  && request.resource.data.cancelledBy == 'Customer'
+&& changedOnly([
+  'bookingStatus',
+  'paymentStatus',
+  'cancellationType',
+  'cancelledBy',
+  'cancelledAt',
+  'refundAmount',
+  'refundStatus',
+  'platformFeeRefunded',
+  'ownerPayoutStatus',
+  'ownerReceivableAmount',
+  'cancellationRemarks'
+]))
 
     // ---------- Payments ----------
     match /payments/{paymentId} {

@@ -54,28 +54,41 @@ export async function POST(request: Request) {
     const refundAmountInPaise =
       Math.round(amount * 100);
 
-    const refund =
-      await razorpay.payments.refund(
-        paymentId,
-        {
-          amount:
-            refundAmountInPaise,
+      console.log("REFUND REQUEST:", {
+  paymentId,
+  amount,
+  refundAmountInPaise,
+  bookingId,
+});
 
-          speed: "normal",
+// First verify that this payment belongs to the
+// Razorpay account configured in this application.
 
-          notes: {
-            bookingId:
-              bookingId ||
-              "Not Available",
+const payment =
+  await razorpay.payments.fetch(paymentId);
 
-            refundType:
-              "Parking Amount Only",
+console.log("RAZORPAY PAYMENT FETCH:", {
+  id: payment.id,
+  amount: payment.amount,
+  status: payment.status,
+  order_id: payment.order_id,
+  amount_refunded: payment.amount_refunded,
+  currency: payment.currency,
+});
 
-            platformFeeRefunded:
-              "false",
-          },
-        }
-      );
+const refund =
+  await razorpay.payments.refund(
+    paymentId,
+    {
+      amount: refundAmountInPaise,
+      speed: "normal",
+    }
+  );
+
+console.log(
+  "RAZORPAY REFUND SUCCESS:",
+  refund
+);
 
     return NextResponse.json(
       {

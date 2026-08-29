@@ -245,8 +245,6 @@ export async function POST(
         ? result.items
         : [];
 
-
-
     let processed = 0;
     let matched = 0;
     let updated = 0;
@@ -256,8 +254,8 @@ export async function POST(
       processed++;
 
       /*
-        Only payment transactions should update
-        parking payment documents.
+        Only settled payment transactions should
+        update parking payment documents.
       */
 
       if (
@@ -269,75 +267,238 @@ export async function POST(
         continue;
       }
 
-      let paymentDoc = null;
+      let paymentDoc: any = null;
 
-/*
-  First try matching with Razorpay Payment ID.
-*/
-const paymentIdSnapshot =
-  await adminDb
-    .collection("payments")
-    .where(
-      "razorpayPaymentId",
-      "==",
-      item.entity_id
-    )
-    .limit(1)
-    .get();
+      /*
+        First try matching with Razorpay Payment ID.
+      */
 
-if (!paymentIdSnapshot.empty) {
-  paymentDoc =
-    paymentIdSnapshot.docs[0];
-}
+      const paymentIdSnapshot =
+        await adminDb
+          .collection("payments")
+          .where(
+            "razorpayPaymentId",
+            "==",
+            item.entity_id
+          )
+          .limit(1)
+          .get();
 
-/*
-  If Payment ID is not found, try Razorpay Order ID.
-*/
-if (
-  !paymentDoc &&
-  item.order_id
-) {
-  const orderIdSnapshot =
-    await adminDb
-      .collection("payments")
-      .where(
-        "razorpayOrderId",
-        "==",
+      if (!paymentIdSnapshot.empty) {
+        paymentDoc =
+          paymentIdSnapshot.docs[0];
+      }
+
+      /*
+        If Payment ID is not found, try Razorpay Order ID.
+      */
+
+      if (
+        !paymentDoc &&
         item.order_id
-      )
-      .limit(1)
-      .get();
+      ) {
+        const orderIdSnapshot =
+          await adminDb
+            .collection("payments")
+            .where(
+              "razorpayOrderId",
+              "==",
+              item.order_id
+            )
+            .limit(1)
+            .get();
 
-  if (!orderIdSnapshot.empty) {
-    paymentDoc =
-      orderIdSnapshot.docs[0];
-  }
-}
+        if (!orderIdSnapshot.empty) {
+          paymentDoc =
+            orderIdSnapshot.docs[0];
+        }
+      }
 
-/*
-  Log the unmatched Razorpay transaction.
-*/
-if (!paymentDoc) {
-  console.log(
-    "Settlement payment not matched:",
-    {
-      razorpayPaymentId:
-        item.entity_id,
-      razorpayOrderId:
-        item.order_id || "",
-      settlementId:
-        item.settlement_id || "",
-    }
-  );
+      /*
+        Log unmatched Razorpay transaction.
+      */
 
-  skipped++;
-  continue;
-}
+      if (!paymentDoc) {
+        console.log(
+          "Settlement payment not matched:",
+          {
+            razorpayPaymentId:
+              item.entity_id,
 
-matched++;
+            razorpayOrderId:
+              item.order_id || "",
+
+            settlementId:
+              item.settlement_id || "",
+          }
+        );
+
+        skipped++;
+        continue;
+      }
+
+      matched++;
 
       const paymentData =
         paymentDoc.data();
+
+        let refundPending = false;
+
+if (paymentData.bookingDocumentId) {
+  const bookingSnapshot = await adminDb
+    .collection("bookings")
+    .doc(paymentData.bookingDocumentId)
+    .get();
+
+  if (bookingSnapshot.exists) {
+    const bookingData =
+      bookingSnapshot.data();
+
+    if (
+      bookingData?.bookingStatus === "Rejected" &&
+      bookingData?.refundStatus === "Pending"
+    ) {
+      refundPending = true;
+    }
+  }
+}
+
+      /*
+        ------------------------------------------------
+        FIND LINKED BOOKING
+        ------------------------------------------------
+
+        Existing records may have:
+        1. bookingDocumentId
+        2. payment.bookingId containing Firestore
+           booking document ID
+        3. payment.bookingId containing business
+           booking ID such as BK1691
+      */
+
+      let bookingDoc: any = null;
+
+      /*
+        1. Existing bookingDocumentId
+      */
+
+      if (
+        paymentData.bookingDocumentId
+      ) {
+        const bookingSnapshot =
+          await adminDb
+            .collection("bookings")
+            .doc(
+              paymentData.bookingDocumentId
+            )
+            .get();
+
+        if (bookingSnapshot.exists) {
+          bookingDoc =
+            bookingSnapshot;
+        }
+      }
+
+      /*
+        2. Try payment.bookingId as Firestore
+           document ID.
+      */
+
+      if (
+        !bookingDoc &&
+        paymentData.bookingId
+      ) {
+        const bookingSnapshot =
+          await adminDb
+            .collection("bookings")
+            .doc(
+              paymentData.bookingId
+            )
+            .get();
+
+        if (bookingSnapshot.exists) {
+          bookingDoc =
+            bookingSnapshot;
+        }
+      }
+
+      /*
+        3. Finally try payment.bookingId as the
+           business bookingId field.
+      */
+
+      if (
+        !bookingDoc &&
+        paymentData.bookingId
+      ) {
+        const bookingQuery =
+          await adminDb
+            .collection("bookings")
+            .where(
+              "bookingId",
+              "==",
+              paymentData.bookingId
+            )
+            .limit(1)
+            .get();
+
+        if (!bookingQuery.empty) {
+          bookingDoc =
+            bookingQuery.docs[0];
+        }
+      }
+
+      /*
+        If booking cannot be found, update only the
+        payment settlement information and do not
+        mark it eligible.
+      */
+
+      const bookingData =
+        bookingDoc?.data() || null;
+
+      /*
+        ------------------------------------------------
+        PAYOUT ELIGIBILITY
+        ------------------------------------------------
+
+        Owner payout is eligible ONLY when the
+        booking itself is Completed.
+
+        Settlement alone is NOT enough.
+      */
+
+      const bookingCompleted =
+  bookingData?.bookingStatus === "Completed";
+
+const alreadyPaid =
+  paymentData.ownerPayoutStatus === "Paid" ||
+  bookingData?.ownerPayoutStatus === "Paid";
+
+const ownerPayoutStatus =
+  alreadyPaid
+    ? "Paid"
+    : refundPending
+      ? "Not Eligible"
+      : bookingCompleted
+        ? "Eligible"
+        : "Not Eligible";
+
+const eligibleForPayout =
+  !alreadyPaid &&
+  !refundPending &&
+  bookingCompleted;
+
+const payoutEligibleAt =
+  alreadyPaid
+    ? paymentData.payoutEligibleAt || null
+    : eligibleForPayout
+      ? (
+          paymentData.eligibleForPayout === true
+            ? paymentData.payoutEligibleAt || null
+            : FieldValue.serverTimestamp()
+        )
+      : null;
 
       const settledAt =
         item.settled_at
@@ -347,12 +508,24 @@ matched++;
           : FieldValue
               .serverTimestamp();
 
+      /*
+        ------------------------------------------------
+        SETTLEMENT DATA
+        ------------------------------------------------
+      */
+
       const settlementData = {
         settlementStatus:
           "Settled",
 
-          settlementPaymentId:
-  item.entity_id || "",
+        ownerPayoutStatus,
+
+        eligibleForPayout,
+
+        payoutEligibleAt,
+
+        settlementPaymentId:
+          item.entity_id || "",
 
         settlementId:
           item.settlement_id || "",
@@ -360,11 +533,11 @@ matched++;
         settlementUtr:
           item.settlement_utr || "",
 
-settlementGrossAmount:
-  toRupees(item.amount),
+        settlementGrossAmount:
+          toRupees(item.amount),
 
-settlementAmount:
-  toRupees(item.credit),
+        settlementAmount:
+          toRupees(item.credit),
 
         settlementFee:
           toRupees(item.fee),
@@ -387,37 +560,224 @@ settlementAmount:
           FieldValue
             .serverTimestamp(),
 
+            ...(refundPending
+  ? {
+      refundStatus: "Pending",
+      paymentStatus: "Refund Pending",
+    }
+  : {}),
+
         updatedAt:
           FieldValue
             .serverTimestamp(),
       };
 
+      /*
+        ------------------------------------------------
+        PAYMENT DATA
+        ------------------------------------------------
+
+        Copy the required booking information into
+        the payment document so the Admin payout
+        screen has all required information.
+      */
+
+      const paymentBookingData =
+        bookingDoc
+          ? {
+              bookingDocumentId:
+                bookingDoc.id,
+
+              bookingId:
+                bookingData.bookingId ||
+                paymentData.bookingId ||
+                "",
+
+              customerUid:
+                bookingData.customerUid ||
+                paymentData.customerUid ||
+                "",
+
+              customerId:
+                bookingData.customerId ||
+                paymentData.customerId ||
+                "",
+
+              customerName:
+                bookingData.customerName ||
+                paymentData.customerName ||
+                "",
+
+              customerEmail:
+                bookingData.customerEmail ||
+                paymentData.customerEmail ||
+                "",
+
+              customerPhone:
+                bookingData.customerPhone ||
+                paymentData.customerPhone ||
+                "",
+
+              ownerUid:
+                bookingData.ownerUid ||
+                paymentData.ownerUid ||
+                "",
+
+              ownerId:
+                bookingData.ownerId ||
+                paymentData.ownerId ||
+                "",
+
+              ownerName:
+                bookingData.ownerName ||
+                "",
+
+              ownerEmail:
+                bookingData.ownerEmail ||
+                "",
+
+              ownerPhone:
+                bookingData.ownerPhone ||
+                "",
+
+              ownerPhoto:
+                bookingData.ownerPhoto ||
+                "",
+
+              ownerReceivableAmount:
+                Number(
+                  bookingData.ownerReceivableAmount ||
+                  0
+                ),
+
+              parkingId:
+                bookingData.parkingId ||
+                paymentData.parkingId ||
+                "",
+
+              parkingTitle:
+                bookingData.parkingTitle ||
+                "",
+
+              parkingLocation:
+                bookingData.parkingLocation ||
+                "",
+
+              parkingImage:
+                bookingData.parkingImage ||
+                "",
+
+              plan:
+                bookingData.plan ||
+                "",
+
+              ownerPayoutStatus,
+
+              eligibleForPayout,
+
+              payoutEligibleAt,
+            }
+          : {
+              /*
+                Booking not found:
+                preserve settlement but do NOT
+                make owner payout eligible.
+              */
+
+              ownerPayoutStatus:
+                "Not Eligible",
+
+              eligibleForPayout:
+                false,
+
+              payoutEligibleAt:
+                null,
+            };
+
+      /*
+        Update PAYMENT document.
+      */
+
       await paymentDoc.ref.set(
-        settlementData,
+        {
+          ...paymentBookingData,
+          ...settlementData,
+        },
         {
           merge: true,
         }
       );
 
-      if (
-        paymentData.bookingDocumentId
-      ) {
-        await adminDb
-          .collection("bookings")
-          .doc(
-            paymentData
-              .bookingDocumentId
-          )
-          .set(
-            settlementData,
-            {
-              merge: true,
-            }
-          );
+      /*
+        ------------------------------------------------
+        UPDATE BOOKING
+        ------------------------------------------------
+      */
+
+      if (bookingDoc) {
+        await bookingDoc.ref.set(
+          {
+            settlementStatus:
+              "Settled",
+
+            settlementPaymentId:
+              item.entity_id || "",
+
+            settlementId:
+              item.settlement_id || "",
+
+            settlementUtr:
+              item.settlement_utr || "",
+
+            settlementGrossAmount:
+              toRupees(item.amount),
+
+            settlementAmount:
+              toRupees(item.credit),
+
+            settlementFee:
+              toRupees(item.fee),
+
+            settlementTax:
+              toRupees(item.tax),
+
+            settlementCurrency:
+              item.currency || "INR",
+
+            settlementOrderId:
+              item.order_id || "",
+
+            settledAt,
+
+            settlementReconciled:
+              true,
+
+            settlementReconciledAt:
+              FieldValue
+                .serverTimestamp(),
+
+            ownerPayoutStatus,
+
+            eligibleForPayout,
+
+            payoutEligibleAt,
+
+            updatedAt:
+              FieldValue
+                .serverTimestamp(),
+          },
+          {
+            merge: true,
+          }
+        );
       }
 
       updated++;
     }
+
+    /*
+      Store reconciliation run history.
+    */
 
     await adminDb
       .collection(

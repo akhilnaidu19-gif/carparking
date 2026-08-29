@@ -442,11 +442,6 @@ const isOwner =
 
               </p>
 
-              <p className="text-green-600 font-bold">
-
-                {parking.ownerPhone}
-
-              </p>
 
             </div>
 

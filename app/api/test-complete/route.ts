@@ -53,22 +53,20 @@ export async function GET() {
 
           await paymentDoc.ref.update({
 
-            bookingStatus: "Completed",
+  bookingStatus: "Completed",
 
-            paymentStatus: "Ready For Payout",
+  paymentStatus: "Ready For Payout",
 
-            ownerPayoutStatus: "Pending",
+  ownerPayoutStatus: "Not Eligible",
 
-            eligibleForPayout: true,
+  eligibleForPayout: false,
 
-            payoutEligibleAt:
-              FieldValue.serverTimestamp(),
+  payoutEligibleAt: null,
 
-            updatedAt:
-              FieldValue.serverTimestamp(),
+  updatedAt:
+    FieldValue.serverTimestamp(),
 
-          });
-
+});
         }
 
         await db

@@ -287,14 +287,35 @@ useEffect(() => {
 
         </div>
 
-        <button
+<button
   onClick={async () => {
 
+    // VALIDATE REQUIRED VEHICLE DETAILS
+    if (!vehicleNumber.trim()) {
+      alert("Please enter your vehicle number.");
+      return;
+    }
+
+    if (!vehicleBrand.trim()) {
+      alert("Please enter your vehicle brand.");
+      return;
+    }
+
+    if (!vehicleModel.trim()) {
+      alert("Please enter your vehicle model.");
+      return;
+    }
+
+    if (!vehicleColor.trim()) {
+      alert("Please enter your vehicle color.");
+      return;
+    }
+
     const parkingRef = doc(
-  db,
-  "parkings",
-  params.id as string
-);
+      db,
+      "parkings",
+      params.id as string
+    );
 
 let parkingDoc;
 

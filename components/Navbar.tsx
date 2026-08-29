@@ -43,9 +43,6 @@ export default function Navbar() {
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
   const auth = getAuth(app);
 
-  useEffect(() => {
-    setIsAdmin(localStorage.getItem("isAdmin") === "true");
-  }, []);
 
   useEffect(() => {
     let unsubscribeNotifications: (() => void) | null = null;
@@ -73,10 +70,18 @@ export default function Navbar() {
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
-          const data = userSnap.data();
-          setUserData(data);
-          setUserPhoto(data.photoURL || data.photo || "");
-        }
+  const data = userSnap.data();
+
+  setUserData(data);
+
+  setUserPhoto(
+    data.photoURL || data.photo || ""
+  );
+
+  setIsAdmin(data.role === "admin");
+} else {
+  setIsAdmin(false);
+}
 
         const ownerQuery = query(
           collection(db, "ownerApplications"),
@@ -484,10 +489,9 @@ export default function Navbar() {
                 <button
                   type="button"
                   onClick={async () => {
-                    await signOut(auth);
-                    localStorage.clear();
-                    window.location.href = "/";
-                  }}
+  await signOut(auth);
+  window.location.href = "/";
+}}
                   className="bg-red-500 text-white py-2 rounded-lg"
                 >
                   Logout

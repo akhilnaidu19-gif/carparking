@@ -36,21 +36,25 @@ export default function SupportPage() {
 const auth = getAuth(app);
 
 const [pageLoading, setPageLoading] = useState(true);
+const [currentUser, setCurrentUser] = useState<any>(null);
 useEffect(() => {
 
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
+  const unsubscribe = onAuthStateChanged(
+    auth,
+    async (user) => {
 
-    if (!user) {
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
 
-      router.replace("/login");
+      setCurrentUser(user);
 
-      return;
+      setPageLoading(false);
 
+      await loadTickets(user.uid);
     }
-
-    setPageLoading(false);
-
-  });
+  );
 
   return () => unsubscribe();
 
@@ -66,40 +70,56 @@ const [category, setCategory] =
 const [tickets, setTickets] = useState<any[]>([]);
 const [loading, setLoading] = useState(false);
 
-  const loadTickets = async () => {
-const userId = localStorage.getItem("userId");
-if (!userId) return;
+  const loadTickets = async (uid: string) => {
+
+  if (!uid) return;
+
+  try {
 
     const q = query(
-  collection(db, "supportTickets"),
-  where("userId", "==", userId),
-  orderBy("createdAt", "desc")
-);
+      collection(db, "supportTickets"),
+      where("userId", "==", uid),
+      orderBy("createdAt", "desc")
+    );
 
-const snapshot = await getDocs(q);
+    const snapshot = await getDocs(q);
 
-const data = snapshot.docs.map((doc) => ({
-  id: doc.id,
-  ...doc.data(),
-}));
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-setTickets(data);
-  };
+    setTickets(data);
 
-  useEffect(() => {
-    loadTickets();
-  }, []);
+  } catch (error) {
+
+    console.error(
+      "Unable to load support tickets:",
+      error
+    );
+
+  }
+
+};
+
 
   const submitTicket = async () => {
-    const email = localStorage.getItem("userEmail");
-    const name =
-      localStorage.getItem("userName") || "User";
-      const userId = localStorage.getItem("userId");
 
-if (!userId) {
-  alert("Please Login");
-  return;
-}
+  const currentUser =
+    auth.currentUser;
+
+  if (!currentUser) {
+    alert("Please Login");
+    return;
+  }
+
+  const userId = currentUser.uid;
+
+const name =
+  currentUser.displayName || "User";
+
+const email =
+  currentUser.email || "";
 
     if (
 
@@ -239,7 +259,7 @@ setMessage("");
 setScreenshot(null);
 setCategory("");
 
-      loadTickets();
+      await loadTickets(currentUser.uid);
     } catch (error) {
       console.error(error);
       alert("Failed to create ticket");

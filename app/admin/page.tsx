@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 
 import {
@@ -57,6 +57,8 @@ export default function AdminPage() {
   const [notification, setNotification] =
     useState("");
 
+    const bookingsInitialized = useRef(false);
+
     const [tickets, setTickets] =
   useState<any[]>([]);
 
@@ -100,7 +102,9 @@ const pendingRefunds = payments
   .filter(
     (payment) =>
       payment.refundStatus === "Pending" ||
-      payment.paymentStatus === "Refund Pending"
+      payment.refundStatus === "Failed" ||
+      payment.paymentStatus === "Refund Pending" ||
+      payment.paymentStatus === "Refund Failed"
   )
   .sort(
     (a, b) =>
@@ -113,7 +117,6 @@ const refundHistory = payments
     (booking) =>
       booking.refundStatus === "Completed" ||
       booking.refundStatus === "Processing" ||
-      booking.refundStatus === "Failed" ||
       booking.paymentStatus === "Refunded" ||
       booking.paymentStatus === "Refund Processing"
   )
@@ -368,33 +371,48 @@ if (
 
   // FETCH BOOKINGS
 
-  useEffect(() => {
+useEffect(() => {
 
-    const unsubscribe =
-      onSnapshot(
+  const unsubscribe =
+    onSnapshot(
 
-        collection(db, "bookings"),
+      collection(db, "bookings"),
 
-        (snapshot) => {
+      (snapshot) => {
 
-          const bookingData: any[] =
-            [];
+        const bookingData: any[] = [];
 
-          snapshot.forEach((doc) => {
+        snapshot.forEach((doc) => {
 
-            bookingData.push({
+          bookingData.push({
 
-              id: doc.id,
+            id: doc.id,
 
-              ...doc.data(),
-
-            });
+            ...doc.data(),
 
           });
 
-          setBookings(
-            bookingData
+        });
+
+        // Always update booking list
+        setBookings(bookingData);
+
+        // Do NOT show notification for the initial Firestore load
+        if (!bookingsInitialized.current) {
+
+          bookingsInitialized.current = true;
+
+          return;
+        }
+
+        // Check whether a genuinely new booking was added
+        const newBookingAdded =
+          snapshot.docChanges().some(
+            (change) =>
+              change.type === "added"
           );
+
+        if (newBookingAdded) {
 
           setNotification(
             "New Booking Received"
@@ -408,11 +426,13 @@ if (
 
         }
 
-      );
+      }
 
-    return () => unsubscribe();
+    );
 
-  }, []);
+  return () => unsubscribe();
+
+}, []);
 
   // FETCH PAYMENTS
 

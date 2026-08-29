@@ -96,9 +96,34 @@ export default function RefundRequests({
                     <h4 className="font-bold text-green-700 mb-3">
                       💰 Refund Details
                     </h4>
-                    <p><b>Customer Paid:</b> ₹{booking.customerPaidAmount || 0}</p>
-                    <p><b>Parking Amount:</b> ₹{booking.parkingAmount || 0}</p>
-                    <p><b>Platform Fee:</b> ₹{booking.platformFeeAmount || 0}</p>
+                    <p>
+  <b>Customer Paid:</b>{" "}
+  ₹{Number(
+    booking.customerPaidAmount ??
+    booking.amount ??
+    0
+  ).toLocaleString("en-IN")}
+</p>
+
+<p>
+  <b>Parking Amount:</b>{" "}
+  ₹{Number(
+    booking.parkingAmount ??
+    booking.ownerReceivableAmount ??
+    0
+  ).toLocaleString("en-IN")}
+</p>
+
+<p>
+  <b>Platform Fee:</b>{" "}
+  ₹{Number(
+    booking.platformFeeAmount ??
+    (
+      Number(booking.amount ?? 0) -
+      Number(booking.ownerReceivableAmount ?? 0)
+    )
+  ).toLocaleString("en-IN")}
+</p>
                     <p className="break-all mt-2">
   <b>Payment ID:</b>{" "}
   {booking.razorpayPaymentId ||
@@ -117,9 +142,14 @@ export default function RefundRequests({
   <b>Order ID:</b>{" "}
   {booking.razorpayOrderId || "Not Available"}
 </p>
-                    <p className="text-red-600 font-bold">
-                      Refund Amount: ₹{booking.refundAmount || booking.parkingAmount || 0}
-                    </p>
+                 <p className="text-red-600 font-bold">
+  Refund Amount: ₹{Number(
+    booking.refundAmount ??
+    booking.parkingAmount ??
+    booking.ownerReceivableAmount ??
+    0
+  ).toLocaleString("en-IN")}
+</p>
                     <p className="text-gray-500 text-sm">
                       Platform fee is non-refundable.
                     </p>
@@ -132,11 +162,12 @@ export default function RefundRequests({
     const paymentId =
       booking.razorpayPaymentId || "";
 
-    const refundAmount = Number(
-      booking.refundAmount ||
-      booking.parkingAmount ||
-      0
-    );
+const refundAmount = Number(
+  booking.refundAmount ??
+  booking.parkingAmount ??
+  booking.ownerReceivableAmount ??
+  0
+);
 
     const bookingDocumentId =
       booking.bookingDocumentId || "";

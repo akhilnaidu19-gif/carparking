@@ -437,6 +437,7 @@ export async function POST(request: Request) {
             adminDb.collection(
               "bookings"
             ).doc();
+            
 
           /*
             Preserve the existing booking fields,

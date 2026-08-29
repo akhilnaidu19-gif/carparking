@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   collection,
@@ -12,8 +13,9 @@ import {
   getDocs,
   getDoc,
   orderBy,
-updateDoc,
-runTransaction,
+  limit,
+  updateDoc,
+  runTransaction,
 } from "firebase/firestore";
 
 import {
@@ -24,8 +26,6 @@ import {
 import { app, db } from "@/lib/firebase";
 
 import { sendNotification } from "@/lib/notifications";
-
-import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
 
@@ -47,6 +47,9 @@ const [
 
     const [notifications, setNotifications] =
   useState<any[]>([]);
+
+  const [unreadNotificationCount, setUnreadNotificationCount] =
+  useState(0);
 
   const [earnings, setEarnings] =
     useState(0);
@@ -157,43 +160,7 @@ where(
             parkingData
           );
 
-          // FETCH BOOKINGS
-
-          const bookingsQuery = query(
-  collection(db, "bookings"),
-where(
-  "ownerUid",
-  "==",
-  user.uid
-)
-);
-
-const bookingsSnapshot = await getDocs(bookingsQuery);
-
-const bookingData: any[] = [];
-let total = 0;
-
-bookingsSnapshot.forEach((bookingDoc) => {
-
-  const data = bookingDoc.data();
-
-    bookingData.push({
-      id: bookingDoc.id,
-      ...data,
-    });
-
-    if (data.bookingStatus === "Completed") {
-      total += Number(
-        data.ownerReceivableAmount || 0
-      );
-    }
-
-  
-
-});
-
-setBookings(bookingData);
-setEarnings(total);
+         
 
           setLoading(false);
 
@@ -213,6 +180,59 @@ setEarnings(total);
 
   }, [user]);
 
+  // FETCH OWNER BOOKINGS IN REAL TIME
+useEffect(() => {
+  if (!user) return;
+
+  const bookingsQuery = query(
+    collection(db, "bookings"),
+    where(
+      "ownerUid",
+      "==",
+      user.uid
+    )
+  );
+
+  const unsubscribe = onSnapshot(
+    bookingsQuery,
+    (snapshot) => {
+
+      const bookingData: any[] = [];
+      let total = 0;
+
+      snapshot.forEach((bookingDoc) => {
+
+        const data = bookingDoc.data();
+
+        bookingData.push({
+          id: bookingDoc.id,
+          ...data,
+        });
+
+        if (data.bookingStatus === "Completed") {
+          total += Number(
+            data.ownerReceivableAmount || 0
+          );
+        }
+
+      });
+
+      setBookings(bookingData);
+      setEarnings(total);
+
+    },
+    (error) => {
+      console.error(
+        "Owner bookings listener error:",
+        error
+      );
+    }
+  );
+
+  return () => unsubscribe();
+
+}, [user]);
+
   useEffect(() => {
 
   if (!user) return;
@@ -220,7 +240,8 @@ setEarnings(total);
   const q = query(
   collection(db, "notifications"),
   where("recipientUid", "==", user.uid),
-  orderBy("createdAt", "desc")
+  orderBy("createdAt", "desc"),
+limit(5)
 );
 
   const unsubscribe =
@@ -244,6 +265,140 @@ setNotifications(data);
   return () => unsubscribe();
 
 }, [user]);
+
+const markDashboardNotificationAsRead = async (
+  notificationId: string
+) => {
+  try {
+    const notification = notifications.find(
+      (item) => item.id === notificationId
+    );
+
+    if (!notification || notification.read === true) {
+      return;
+    }
+
+    await updateDoc(
+      doc(db, "notifications", notificationId),
+      {
+        read: true,
+        readAt: new Date(),
+      }
+    );
+
+    console.log(
+      "Dashboard notification marked as read:",
+      notificationId
+    );
+  } catch (error) {
+    console.error(
+      "Failed to mark dashboard notification as read:",
+      error
+    );
+  }
+};
+
+useEffect(() => {
+
+  if (!user) {
+    setUnreadNotificationCount(0);
+    return;
+  }
+
+  const unreadQuery = query(
+    collection(db, "notifications"),
+    where("recipientUid", "==", user.uid),
+    where("read", "==", false)
+  );
+
+  const unsubscribeUnread =
+    onSnapshot(
+      unreadQuery,
+      (snapshot) => {
+        setUnreadNotificationCount(
+          snapshot.size
+        );
+      },
+      (error) => {
+        console.error(
+          "Unread notification listener error:",
+          error
+        );
+      }
+    );
+
+  return () => unsubscribeUnread();
+
+}, [user]);
+
+const markNotificationAsRead = async (
+  notificationId: string
+) => {
+  try {
+    console.log("Marking notification as read:", notificationId);
+
+    const notificationRef = doc(
+      db,
+      "notifications",
+      notificationId
+    );
+
+    // Check the notification exists
+    const notificationSnap = await getDoc(
+      notificationRef
+    );
+
+    if (!notificationSnap.exists()) {
+      console.error(
+        "Notification document not found:",
+        notificationId
+      );
+      return;
+    }
+
+    console.log(
+      "Current notification data:",
+      notificationSnap.data()
+    );
+
+    // Don't update again if already read
+    if (notificationSnap.data().read === true) {
+      console.log("Notification is already read.");
+      return;
+    }
+
+    // Save to Firestore FIRST
+    await updateDoc(
+      notificationRef,
+      {
+        read: true,
+        readAt: new Date(),
+      }
+    );
+
+    console.log(
+      "Notification successfully marked as read in Firestore"
+    );
+
+    // Update UI after Firestore succeeds
+    setNotifications((current) =>
+      current.map((notification) =>
+        notification.id === notificationId
+          ? {
+              ...notification,
+              read: true,
+            }
+          : notification
+      )
+    );
+
+  } catch (error) {
+    console.error(
+      "ERROR marking notification as read:",
+      error
+    );
+  }
+};
 
   // STATS
 
@@ -708,11 +863,11 @@ const visibleBookings =
 
     </h2>
 
-    <div className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold">
-
-      {notifications.length}
-
-    </div>
+<div className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold">
+  {notifications.filter(
+    (notification) => notification.read !== true
+  ).length}
+</div>
 
   </div>
 
@@ -728,29 +883,47 @@ const visibleBookings =
 
     <div className="grid gap-4">
 
-      {notifications
-        .slice(0, 10)
-        .map(
-          (notification) => (
+{[
+  ...notifications.filter(
+    (notification) => notification.read !== true
+  ),
+  ...notifications.filter(
+    (notification) => notification.read === true
+  ),
+].map(
+  (notification) => (
 
             <div
-              key={notification.id}
-              className="border rounded-2xl p-4"
-            >
+  key={notification.id}
+  onClick={() =>
+    markDashboardNotificationAsRead(
+      notification.id
+    )
+  }
+  className={`border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${
+    notification.read === true
+      ? "bg-white border-gray-300"
+      : "bg-green-50 border-green-400 shadow-md"
+  }`}
+>
+  <div className="flex items-start justify-between gap-4">
+    <div>
+      <h3 className="font-bold text-lg">
+        {notification.title}
+      </h3>
 
-              <h3 className="font-bold text-lg">
+      <p className="text-gray-600">
+        {notification.message}
+      </p>
+    </div>
 
-                {notification.title}
-
-              </h3>
-
-              <p className="text-gray-600">
-
-                {notification.message}
-
-              </p>
-
-            </div>
+    {notification.read !== true && (
+      <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+        NEW
+      </span>
+    )}
+  </div>
+</div>
 
           )
         )}
@@ -1331,14 +1504,27 @@ const visibleBookings =
     </div>
 
     <div>
-      <p className="text-gray-500 text-sm">
-        Parking ID
-      </p>
+  <p className="text-gray-500 text-sm">
+    Parking ID
+  </p>
 
-      <p className="font-semibold">
-        {booking.parkingId}
-      </p>
-    </div>
+  <p className="font-semibold">
+    {parkings.find(
+      (parking) =>
+        parking.id === booking.parkingId
+    )?.parkingId || "Not Available"}
+  </p>
+</div>
+
+<div>
+  <p className="text-gray-500 text-sm">
+    Booking ID
+  </p>
+
+  <p className="font-semibold">
+    {booking.bookingId || "Not Available"}
+  </p>
+</div>
 
     <div>
       <p className="text-gray-500 text-sm">
@@ -1533,94 +1719,158 @@ const visibleBookings =
   <>
 
     <button
-      onClick={async () => {
+     onClick={async () => {
 
-  try {
-
-  const parkingRef = doc(
-    db,
-    "parkings",
-    booking.parkingId
-  );
-
-  const parkingSnap = await getDoc(parkingRef);
-
-  if (!parkingSnap.exists()) {
-    alert("Parking not found");
+  if (processingBookingId === booking.id) {
     return;
   }
 
-  const parking = parkingSnap.data();
+  setProcessingBookingId(booking.id);
 
+  try {
 
+    const bookingRef = doc(
+      db,
+      "bookings",
+      booking.id
+    );
 
-// Update Booking
+    // Get the latest booking from Firestore
+    const latestBookingSnap =
+      await getDoc(bookingRef);
 
-await updateDoc(
-  doc(db, "bookings", booking.id),
-  {
-    bookingStatus: "Approved",
-    ownerApprovalStatus: "Approved",
-    approvedDate: new Date(),
-  }
-);
+    if (!latestBookingSnap.exists()) {
+      alert("Booking not found.");
+      return;
+    }
 
-// Update Payment
+    const latestBookingData =
+      latestBookingSnap.data();
 
-const paymentSnapshot = await getDocs(
-  query(
-    collection(db, "payments"),
-    where("bookingDocumentId", "==", booking.id)
+    // Make sure booking is still pending
+    if (
+      latestBookingData.bookingStatus !==
+      "Pending Approval"
+    ) {
+      alert(
+        "This booking has already been processed."
+      );
+      return;
+    }
+
+    // Approve booking
+    await updateDoc(
+      bookingRef,
+      {
+        bookingStatus: "Approved",
+        ownerApprovalStatus: "Approved",
+        approvedDate: new Date(),
+        updatedAt: new Date(),
+      }
+    );
+
+    setBookings((currentBookings) =>
+  currentBookings.map((item) =>
+    item.id === booking.id
+      ? {
+          ...item,
+          bookingStatus: "Approved",
+          ownerApprovalStatus: "Approved",
+          approvedDate: new Date(),
+          updatedAt: new Date(),
+        }
+      : item
   )
 );
 
-if (!paymentSnapshot.empty) {
+    // Update corresponding payment
+    const paymentSnapshot =
+      await getDocs(
+        query(
+          collection(db, "payments"),
+          where(
+            "bookingDocumentId",
+            "==",
+            booking.id
+          )
+        )
+      );
 
-  const paymentDoc =
-    paymentSnapshot.docs[0];
+    if (!paymentSnapshot.empty) {
 
-  await updateDoc(
-    paymentDoc.ref,
-    {
-      bookingStatus: "Approved",
-      ownerApprovalStatus: "Approved",
-      approvedDate: new Date(),
-      updatedAt: new Date(),
+      const paymentDoc =
+        paymentSnapshot.docs[0];
+
+      await updateDoc(
+        paymentDoc.ref,
+        {
+          bookingStatus: "Approved",
+          ownerApprovalStatus: "Approved",
+          approvedDate: new Date(),
+          updatedAt: new Date(),
+        }
+      );
+
     }
-  );
 
-}
+    // Notify customer
+    try {
 
-alert("Booking Approved");
+      await sendNotification({
+        recipientUid:
+          booking.customerUid,
 
-try {
-  await sendNotification({
-    recipientUid: booking.customerUid,
-    recipientRole: "customer",
-    title: "Booking Approved",
-    message: `Your booking for "${booking.parkingTitle || "the parking"}" has been approved by the parking owner.`,
-    type: "BOOKING",
-    relatedId: booking.id,
-  });
-} catch (notificationError) {
-  console.error(
-    "Unable to send booking approval notification:",
-    notificationError
-  );
-}
+        recipientRole:
+          "customer",
 
-} catch (error) {
+        title:
+          "Booking Approved",
 
-  console.log(error);
+        message:
+          `Your booking for "${
+            booking.parkingTitle ||
+            "the parking"
+          }" has been approved by the parking owner.`,
 
-  alert("Failed to approve booking");
+        type: "BOOKING",
 
-}
+        relatedId: booking.id,
+      });
+
+    } catch (notificationError) {
+
+      console.error(
+        "Unable to send booking approval notification:",
+        notificationError
+      );
+
+    }
+
+    alert("Booking Approved");
+
+  } catch (error) {
+
+    console.error(
+      "Approve booking error:",
+      error
+    );
+
+    alert(
+      "Failed to approve booking"
+    );
+
+  } finally {
+
+    setProcessingBookingId(null);
+
+  }
 
 }}
       className="bg-green-700 text-white px-6 py-3 rounded-2xl font-bold"
     >
-      ✅ Approve Booking
+      {processingBookingId === booking.id
+  ? "Approving..."
+  : "✅ Approve Booking"}
     </button>
 
 <button

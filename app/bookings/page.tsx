@@ -556,12 +556,10 @@ alt={booking.parkingTitle}
         </p>
 
         <p className="font-semibold text-sm">
-          {booking.bookingDate?.seconds
-  ? new Date(
-      booking.bookingDate.seconds * 1000
-    ).toLocaleString()
-  : "N/A"}
-        </p>
+  {booking.bookingDate
+    ? new Date(booking.bookingDate).toLocaleString()
+    : "N/A"}
+</p>
 
       </div>
 
@@ -735,6 +733,11 @@ Please share further details.`
 
 </button>
 
+{(
+  booking.bookingStatus === "Approved" ||
+  booking.bookingStatus === "Completed"
+) && (
+
 <button
   disabled={booking.bookingStatus === "Completed"}
 
@@ -890,6 +893,7 @@ const amount =
   Renew Booking
 
 </button>
+)}
 
 
 

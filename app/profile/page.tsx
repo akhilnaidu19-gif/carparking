@@ -214,31 +214,7 @@ export default function ProfilePage() {
   }
 );
 
-        localStorage.setItem(
-  "userPhone",
-  phone
-);
-
-localStorage.setItem(
-  "userName",
-  name
-);
-
-localStorage.setItem(
-  "userCity",
-  city
-);
-
-localStorage.setItem(
-  "userPhoto",
-  uploadedPhoto
-);
-
-localStorage.setItem(
-  "userId",
-  userId
-);
-
+       
         // FIREBASE AUTH PROFILE
 
         await updateProfile(
@@ -397,16 +373,11 @@ localStorage.setItem(
 
                 onClick={async () => {
 
-                  await signOut(
-                    auth
-                  );
+  await signOut(auth);
 
-                  localStorage.clear();
+  window.location.href = "/";
 
-                  window.location.href =
-                    "/";
-
-                }}
+}}
 
                 className="bg-red-500 text-white px-6 py-4 rounded-2xl font-bold"
 
